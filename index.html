@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#05060d">
+<title>PolyChat</title>
+<script>
+  (function() {
+    var theme = localStorage.getItem('polychat_theme');
+    if (!theme) {
+      theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap">
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+
+<!-- Mobile sidebar backdrop -->
+<div id="sidebar-overlay"></div>
+
+<!-- ─── SIDEBAR ─── -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo-block">
+      <div class="logo">PolyChat</div>
+    </div>
+    <button id="new-chat-btn" title="新建对话">＋</button>
+  </div>
+
+  <div class="sidebar-profile-bar" id="sidebar-profile-bar">
+    <div class="active-profile-info">
+      <span class="profile-active-dot"></span>
+      <div class="profile-active-text">
+        <span id="sidebar-profile-name">未配置</span>
+        <span id="sidebar-profile-model" class="profile-active-model"></span>
+      </div>
+    </div>
+    <button class="profile-switch-btn" id="open-profile-mgr-btn" title="管理方案">⇄</button>
+  </div>
+
+  <div id="conversation-list"></div>
+
+  <div class="sidebar-footer">
+    <button class="theme-toggle-btn" id="theme-toggle-btn" title="切换主题">☀</button>
+    <button class="sidebar-footer-btn" id="settings-btn">⚙ 设置</button>
+    <button class="sidebar-footer-btn" id="gist-btn">☁ 同步</button>
+  </div>
+</aside>
+
+<!-- ─── MAIN AREA ─── -->
+<main id="main">
+  <div id="chat-header">
+    <button id="menu-btn" title="菜单">☰</button>
+    <span id="chat-title">未选择对话</span>
+    <div id="version-selector-wrap">
+      <button id="version-btn" title="版本管理" style="display:none">
+        <span class="ver-prefix">VER</span>
+        <span id="ver-label-text">—</span>
+        <span class="ver-arrow">▾</span>
+      </button>
+      <div id="version-dropdown"></div>
+    </div>
+    <button class="header-icon-btn" id="add-msg-btn" title="插入消息" style="display:none">＋</button>
+  </div>
+
+  <div id="messages-container">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">💬</div>
+      <p>选择或新建对话，开始聊天</p>
+    </div>
+  </div>
+
+  <div id="input-area">
+    <div class="input-box">
+      <textarea id="message-input" placeholder="输入消息… (Ctrl+Enter 发送)" rows="1"></textarea>
+      <div class="input-btns">
+        <button id="stop-btn">⏹ 停止</button>
+        <button id="send-btn" title="发送">➤</button>
+      </div>
+    </div>
+    <div class="input-meta">
+      <span class="input-hint">Ctrl+Enter 发送</span>
+      <div class="api-status-indicator">
+        <span class="status-dot" id="api-status-dot"></span>
+        <span id="api-status-label">未配置</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ══════════════════════════════════════════ -->
+<!--  MODALS                                   -->
+<!-- ══════════════════════════════════════════ -->
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-overlay">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <span class="modal-title">⚙ 设置</span>
+      <button class="modal-close" data-close="settings-overlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs" id="settings-tabs">
+        <button class="tab-btn active" data-tab="tab-profiles">API 方案</button>
+        <button class="tab-btn" data-tab="tab-params">参数调整</button>
+        <button class="tab-btn" data-tab="tab-data">数据管理</button>
+      </div>
+
+      <!-- Profiles Tab -->
+      <div class="tab-panel active" id="tab-profiles">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <p style="font-size:12px;color:var(--text-3)">点击方案可切换，每套方案独立保存 Key / 模型 / 端点。</p>
+          <button class="btn btn-primary btn-sm" id="new-profile-btn">＋ 新建方案</button>
+        </div>
+        <div id="profile-list"></div>
+      </div>
+
+      <!-- Parameters Tab -->
+      <div class="tab-panel" id="tab-params">
+        <p class="tab-hint">以下参数应用于当前激活的 API 方案。</p>
+        <div class="form-group">
+          <label class="form-label">Temperature <span class="form-label-hint">创意度 (0 → 2)</span></label>
+          <div class="slider-row">
+            <input type="range" id="cfg-temp" class="form-slider" min="0" max="2" step="0.05" value="0.7">
+            <input type="number" id="cfg-temp-val" class="slider-value" min="0" max="2" step="0.05" value="0.7">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max Tokens <span class="form-label-hint">最大输出长度</span></label>
+          <div class="slider-row">
+            <input type="range" id="cfg-max-tokens" class="form-slider" min="256" max="32768" step="256" value="2048">
+            <input type="number" id="cfg-max-tokens-val" class="slider-value" min="256" max="32768" style="width:62px" value="2048">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Top P <span class="form-label-hint">概率裁剪 (0 → 1)</span></label>
+          <div class="slider-row">
+            <input type="range" id="cfg-top-p" class="form-slider" min="0" max="1" step="0.05" value="1">
+            <input type="number" id="cfg-top-p-val" class="slider-value" min="0" max="1" step="0.05" value="1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Frequency Penalty <span class="form-label-hint">(-2 → 2)</span></label>
+          <div class="slider-row">
+            <input type="range" id="cfg-freq-pen" class="form-slider" min="-2" max="2" step="0.05" value="0">
+            <input type="number" id="cfg-freq-pen-val" class="slider-value" min="-2" max="2" step="0.05" value="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Presence Penalty <span class="form-label-hint">(-2 → 2)</span></label>
+          <div class="slider-row">
+            <input type="range" id="cfg-pres-pen" class="form-slider" min="-2" max="2" step="0.05" value="0">
+            <input type="number" id="cfg-pres-pen-val" class="slider-value" min="-2" max="2" step="0.05" value="0">
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Tab -->
+      <div class="tab-panel" id="tab-data">
+        <div class="section-title">本地备份</div>
+        <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="export-btn">⬇ 导出 JSON</button>
+          <label class="btn" style="cursor:pointer">
+            ⬆ 导入 JSON
+            <input type="file" id="import-file" accept=".json" style="display:none">
+          </label>
+        </div>
+        <hr class="divider">
+        <div class="section-title">存储信息</div>
+        <div class="info-grid">
+          <div class="info-row"><span class="info-key">对话数量</span><span class="info-val" id="stat-convs">0</span></div>
+          <div class="info-row"><span class="info-key">API 方案数</span><span class="info-val" id="stat-profiles">0</span></div>
+          <div class="info-row"><span class="info-key">本地存储占用</span><span class="info-val" id="stat-size">—</span></div>
+        </div>
+        <hr class="divider">
+        <div class="danger-zone">
+          <div class="danger-zone-title">⚠ 危险区域</div>
+          <button class="btn btn-danger" id="clear-all-btn">🗑 清空所有对话</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" data-close="settings-overlay">关闭</button>
+      <button class="btn btn-primary" id="save-params-btn">保存参数</button>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Edit Modal -->
+<div class="modal-overlay" id="profile-edit-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="profile-edit-title">新建 API 方案</span>
+      <button class="modal-close" data-close="profile-edit-overlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="profile-edit-id">
+      <div class="form-group">
+        <label class="form-label">方案名称</label>
+        <input type="text" id="profile-name" class="form-input" placeholder="例如: OpenAI GPT-4o">
+      </div>
+      <div class="form-group">
+        <label class="form-label">API 端点 <span class="form-label-hint">完整的 /chat/completions 地址</span></label>
+        <input type="text" id="profile-endpoint" class="form-input mono" placeholder="https://api.openai.com/v1/chat/completions">
+      </div>
+      <div class="form-group">
+        <label class="form-label">API Key</label>
+        <input type="password" id="profile-apikey" class="form-input mono" placeholder="sk-...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">模型名称</label>
+        <div class="combobox-wrap">
+          <input type="text" id="profile-model" class="form-input mono" placeholder="gpt-4o" autocomplete="off">
+          <div class="suggestions-list" id="profile-model-suggestions"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">System Prompt</label>
+        <textarea id="profile-system-prompt" class="form-input form-textarea" rows="3" placeholder="可选，留空则不发送系统提示词"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-check">
+          <input type="checkbox" id="profile-stream" checked>
+          <span class="form-check-label">启用流式输出 (Streaming)</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" data-close="profile-edit-overlay">取消</button>
+      <button class="btn btn-primary" id="save-profile-btn">保存方案</button>
+    </div>
+  </div>
+</div>
+
+<!-- GitHub Gist Sync Modal -->
+<div class="modal-overlay" id="gist-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">☁ GitHub Gist 云同步</span>
+      <button class="modal-close" data-close="gist-overlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Personal Access Token
+          <span class="form-label-hint">— 需要 <code style="font-size:10px;background:var(--bg-3);padding:1px 4px;border-radius:3px">gist</code> 权限</span>
+        </label>
+        <input type="password" id="gist-token" class="form-input mono" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+        <p class="field-hint">
+          前往 GitHub → Settings → Developer settings →
+          <a href="https://github.com/settings/tokens/new?scopes=gist" target="_blank" style="color:var(--accent)">生成 Token</a>，勾选 gist 权限即可。
+        </p>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gist ID <span class="form-label-hint">— 首次备份后自动填入，也可手动填写已有 Gist</span></label>
+        <input type="text" id="gist-id" class="form-input mono" placeholder="留空则自动创建新 Gist">
+      </div>
+      <button class="btn" id="gist-test-btn" style="margin-bottom:16px">
+        <span class="status-dot" id="gist-status"></span> 验证 Token
+      </button>
+      <hr class="divider">
+      <div class="section-title">操作</div>
+      <p style="font-size:12px;color:var(--text-2);margin-bottom:12px">
+        备份内容：所有对话（含版本分支）、全部 API 方案（含 Key），保存为私密 Gist。
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="gist-backup-btn">⬆ 备份到 Gist</button>
+        <button class="btn" id="gist-restore-btn">⬇ 从 Gist 恢复</button>
+      </div>
+      <p class="field-hint" style="margin-top:8px">恢复将覆盖所有本地数据。</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" data-close="gist-overlay">关闭</button>
+      <button class="btn btn-primary" id="save-gist-btn">保存配置</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Message Modal -->
+<div class="modal-overlay" id="edit-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">✏ 编辑消息</span>
+      <button class="modal-close" data-close="edit-overlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">消息内容</label>
+        <textarea id="edit-content" class="form-input form-textarea" rows="8"></textarea>
+      </div>
+      <div class="edit-mode-hint">
+        <div class="hint-item"><span class="hint-tag accent">仅保存</span> 修改本条内容，不影响后续对话，不触发 API。</div>
+        <div class="hint-item"><span class="hint-tag success">保存并发送</span> 截断此条之后所有内容，创建新版本分支，AI 重新续写。</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" data-close="edit-overlay">取消</button>
+      <button class="btn" id="edit-save-only-btn">仅保存</button>
+      <button class="btn btn-primary" id="edit-save-send-btn">保存并发送 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Message Modal -->
+<div class="modal-overlay" id="addmsg-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">＋ 插入消息</span>
+      <button class="modal-close" data-close="addmsg-overlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">角色</label>
+        <div class="role-selector">
+          <div class="role-option">
+            <input type="radio" name="add-role" id="role-user" value="user" checked>
+            <label for="role-user" class="user-lbl">👤 用户</label>
+          </div>
+          <div class="role-option">
+            <input type="radio" name="add-role" id="role-assistant" value="assistant">
+            <label for="role-assistant" class="ai-lbl">🤖 AI</label>
+          </div>
+          <div class="role-option">
+            <input type="radio" name="add-role" id="role-system" value="system">
+            <label for="role-system" class="sys-lbl">⚙ 系统</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">内容</label>
+        <textarea id="addmsg-content" class="form-input form-textarea" rows="6" placeholder="输入消息内容…"></textarea>
+      </div>
+      <p class="field-hint">此操作不触发 API，仅追加消息至对话末尾。</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" data-close="addmsg-overlay">取消</button>
+      <button class="btn btn-primary" id="addmsg-confirm-btn">插入</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script src="js/utils.js"></script>
+<script src="js/state.js"></script>
+<script src="js/markdown.js"></script>
+<script src="js/api.js"></script>
+<script src="js/gist.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/events.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
