@@ -25,6 +25,11 @@
     transform: translateX(0);
   }
 
+  /* Light theme — lighter sidebar shadow */
+  [data-theme="light"] #sidebar {
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.10);
+  }
+
   /* Overlay */
   #sidebar-overlay.visible {
     display: block;

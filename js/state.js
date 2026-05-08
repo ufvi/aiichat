@@ -12,7 +12,9 @@ const DEFAULT_PROFILE_CONFIG = {
   topP: 1,
   frequencyPenalty: 0,
   presencePenalty: 0,
-  stream: true
+  stream: true,
+  thinkingEnabled: false,
+  thinkingEffort: 'high'
 };
 
 function createProfile(id, name, overrides = {}) {

@@ -81,7 +81,7 @@ function appendMsgElement(msg, idx, isStreamingPlaceholder = false) {
       <span class="msg-timestamp">${fmtTime(msg.timestamp)}</span>
       <div class="msg-actions" id="actions-${msg.id}">${buildActionBtns(msg)}</div>
     </div>
-    <div class="msg-body">${isStreamingPlaceholder ? '' : renderMarkdown(msg.content)}</div>
+    <div class="msg-body">${isStreamingPlaceholder ? '' : buildMsgBodyHTML(msg.content, msg.reasoning, false)}</div>
   `;
   container.appendChild(wrap);
   return wrap;
@@ -175,6 +175,13 @@ function loadParamsToForm() {
   setSlider('cfg-freq-pen',   'cfg-freq-pen-val',   p.frequencyPenalty);
   setSlider('cfg-pres-pen',   'cfg-pres-pen-val',   p.presencePenalty);
 
+  const thinkingEl = document.getElementById('cfg-thinking');
+  const effortGroup = document.getElementById('cfg-thinking-effort-group');
+  if (thinkingEl) thinkingEl.checked = !!p.thinkingEnabled;
+  if (effortGroup) effortGroup.style.display = p.thinkingEnabled ? '' : 'none';
+  const effortEl = document.getElementById('cfg-thinking-effort');
+  if (effortEl) effortEl.value = p.thinkingEffort || 'high';
+
   document.getElementById('stat-convs').textContent    = Object.keys(state.conversations).length;
   document.getElementById('stat-profiles').textContent = Object.keys(state.apiProfiles).length;
   document.getElementById('stat-size').textContent     = getStorageSize();
@@ -185,6 +192,23 @@ function setSlider(sliderId, valId, value) {
   const vl = document.getElementById(valId);
   if (sl) sl.value = value;
   if (vl) vl.value = value;
+}
+
+/* ─── Thinking / Reasoning block ─── */
+function buildThinkingHTML(reasoning, isStreaming) {
+  if (!reasoning) return '';
+  const openAttr = isStreaming ? ' open' : '';
+  return `<details class="thinking-block"${openAttr}>
+    <summary class="thinking-summary"><span class="thinking-icon">🧠</span> 思考过程<span class="thinking-indicator"></span></summary>
+    <div class="thinking-content">${renderMarkdown(reasoning)}</div>
+  </details>`;
+}
+
+function buildMsgBodyHTML(content, reasoning, isStreaming) {
+  let html = '';
+  if (reasoning) html += buildThinkingHTML(reasoning, isStreaming);
+  html += renderMarkdown(content);
+  return html;
 }
 
 /* ─── Helpers ─── */

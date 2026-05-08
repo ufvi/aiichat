@@ -6,7 +6,8 @@ let abortController = null;
 async function callAPI(messages, onChunk) {
   const profile = getActiveProfile();
   const { endpoint, apiKey, model, systemPrompt, temperature, maxTokens,
-          topP, frequencyPenalty, presencePenalty, stream } = profile;
+          topP, frequencyPenalty, presencePenalty, stream,
+          thinkingEnabled, thinkingEffort } = profile;
 
   const apiMsgs = [];
   if (systemPrompt && systemPrompt.trim()) {
@@ -18,22 +19,39 @@ async function callAPI(messages, onChunk) {
 
   abortController = new AbortController();
 
+  const requestBody = {
+    model,
+    messages: apiMsgs,
+    temperature: parseFloat(temperature),
+    max_tokens: parseInt(maxTokens),
+    top_p: parseFloat(topP),
+    frequency_penalty: parseFloat(frequencyPenalty),
+    presence_penalty: parseFloat(presencePenalty),
+    stream
+  };
+
+  // Thinking / reasoning controls
+  const effort = thinkingEffort || 'high';
+  if (thinkingEnabled) {
+    // OpenAI-compatible format
+    requestBody.thinking = { type: 'enabled' };
+    if (effort) {
+      requestBody.reasoning_effort = effort;
+    }
+    // Anthropic-compatible format (for proxies / alternative endpoints)
+    requestBody.output_config = { effort };
+  } else {
+    // Explicitly disable thinking — model won't produce reasoning_content
+    requestBody.thinking = { type: 'disabled' };
+  }
+
   const resp = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
-    body: JSON.stringify({
-      model,
-      messages: apiMsgs,
-      temperature: parseFloat(temperature),
-      max_tokens: parseInt(maxTokens),
-      top_p: parseFloat(topP),
-      frequency_penalty: parseFloat(frequencyPenalty),
-      presence_penalty: parseFloat(presencePenalty),
-      stream
-    }),
+    body: JSON.stringify(requestBody),
     signal: abortController.signal
   });
 
@@ -50,7 +68,8 @@ async function callAPI(messages, onChunk) {
     const reader = resp.body.getReader();
     const dec = new TextDecoder();
     let buf = '';
-    let full = '';
+    let fullContent = '';
+    let fullReasoning = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -61,20 +80,29 @@ async function callAPI(messages, onChunk) {
         const t = line.trim();
         if (!t.startsWith('data: ')) continue;
         const d = t.slice(6);
-        if (d === '[DONE]') return full;
+        if (d === '[DONE]') return { content: fullContent, reasoning: fullReasoning };
         try {
           const json = JSON.parse(d);
-          const delta = json.choices?.[0]?.delta?.content;
-          if (delta) { full += delta; onChunk(delta, full); }
+          const delta = json.choices?.[0]?.delta;
+          if (!delta) continue;
+          if (delta.content) {
+            fullContent += delta.content;
+          }
+          if (delta.reasoning_content) {
+            fullReasoning += delta.reasoning_content;
+          }
+          onChunk(fullContent, fullReasoning);
         } catch (_) {}
       }
     }
-    return full;
+    return { content: fullContent, reasoning: fullReasoning };
   } else {
     const data = await resp.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    onChunk(content, content);
-    return content;
+    const msg = data.choices?.[0]?.message || {};
+    const content = msg.content || '';
+    const reasoning = msg.reasoning_content || '';
+    onChunk(content, reasoning);
+    return { content, reasoning };
   }
 }
 
@@ -123,14 +151,19 @@ async function sendMessage(userText, isResumeVersion = false) {
     // Messages to send (exclude streaming placeholder)
     const msgsForAPI = ver.messages.slice(0, -1);
     let fullContent = '';
+    let fullReasoning = '';
 
     try {
-      fullContent = await callAPI(msgsForAPI, (delta, full) => {
-        fullContent = full;
-        aiMsg.content = full;
-        if (bodyEl) bodyEl.innerHTML = renderMarkdown(full);
+      const result = await callAPI(msgsForAPI, (content, reasoning) => {
+        fullContent = content;
+        fullReasoning = reasoning || '';
+        aiMsg.content = fullContent;
+        aiMsg.reasoning = fullReasoning;
+        if (bodyEl) bodyEl.innerHTML = buildMsgBodyHTML(fullContent, fullReasoning, true);
         scrollToBottom();
       });
+      fullContent = result.content;
+      fullReasoning = result.reasoning || '';
     } catch (err) {
       if (err.name === 'AbortError') {
         toast('已停止生成', 'info');
@@ -147,10 +180,10 @@ async function sendMessage(userText, isResumeVersion = false) {
     }
 
     aiMsg.content = fullContent;
+    aiMsg.reasoning = fullReasoning;
     if (bodyEl) {
       bodyEl.classList.remove('streaming');
-      bodyEl.innerHTML = renderMarkdown(fullContent);
-      // Re-bind action buttons after content is final
+      bodyEl.innerHTML = buildMsgBodyHTML(fullContent, fullReasoning, false);
       const actionsEl = placeholder.querySelector(`#actions-${aiMsg.id}`);
       if (actionsEl) actionsEl.innerHTML = buildActionBtns(aiMsg);
     }

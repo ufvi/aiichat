@@ -160,6 +160,25 @@
             <input type="number" id="cfg-pres-pen-val" class="slider-value" min="-2" max="2" step="0.05" value="0">
           </div>
         </div>
+        <hr class="divider">
+        <div class="section-title">思考模式</div>
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" id="cfg-thinking">
+            <span class="form-check-label">启用思考模式</span>
+          </label>
+          <p class="field-hint">部分模型（如 DeepSeek R1、o1 系列）支持先思考再回答。</p>
+        </div>
+        <div class="form-group" id="cfg-thinking-effort-group">
+          <label class="form-label">思考强度</label>
+          <select id="cfg-thinking-effort" class="form-input">
+            <option value="low">Low — 快速推理</option>
+            <option value="medium">Medium — 平衡</option>
+            <option value="high" selected>High — 深度推理</option>
+            <option value="max">Max — 最大深度</option>
+          </select>
+          <p class="field-hint">OpenAI 格式: reasoning_effort；Anthropic 格式: output_config.effort</p>
+        </div>
       </div>
 
       <!-- Data Tab -->
@@ -230,6 +249,21 @@
           <input type="checkbox" id="profile-stream" checked>
           <span class="form-check-label">启用流式输出 (Streaming)</span>
         </label>
+      </div>
+      <div class="form-group">
+        <label class="form-check">
+          <input type="checkbox" id="profile-thinking">
+          <span class="form-check-label">启用思考模式 (Thinking)</span>
+        </label>
+      </div>
+      <div class="form-group" id="thinking-effort-group" style="display:none">
+        <label class="form-label">思考强度 <span class="form-label-hint">— 思考深度越高，推理越充分但耗时越长</span></label>
+        <select id="profile-thinking-effort" class="form-input">
+          <option value="low">Low — 快速推理</option>
+          <option value="medium">Medium — 平衡</option>
+          <option value="high" selected>High — 深度推理</option>
+          <option value="max">Max — 最大深度</option>
+        </select>
       </div>
     </div>
     <div class="modal-footer">

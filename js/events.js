@@ -17,8 +17,8 @@ const MODEL_SUGGESTIONS = [
   { model: 'gemini-2.0-flash',         provider: 'Google' },
   { model: 'gemini-1.5-pro',           provider: 'Google' },
   { model: 'gemini-1.5-flash',         provider: 'Google' },
-  { model: 'deepseek-chat',            provider: 'DeepSeek' },
-  { model: 'deepseek-reasoner',        provider: 'DeepSeek' },
+  { model: 'deepseek-v4-flash',         provider: 'DeepSeek' },
+  { model: 'deepseek-v4-pro',           provider: 'DeepSeek' },
   { model: 'mistral-large-latest',     provider: 'Mistral' },
   { model: 'mistral-small-latest',     provider: 'Mistral' },
   { model: 'open-mixtral-8x7b',        provider: 'Mistral' },
@@ -164,6 +164,9 @@ function openNewProfile() {
   document.getElementById('profile-model').value     = 'gpt-4o';
   document.getElementById('profile-system-prompt').value = '';
   document.getElementById('profile-stream').checked  = true;
+  document.getElementById('profile-thinking').checked = false;
+  document.getElementById('profile-thinking-effort').value = 'high';
+  document.getElementById('thinking-effort-group').style.display = 'none';
   openModal('profile-edit-overlay');
 }
 
@@ -179,6 +182,9 @@ function openEditProfile(profileId) {
   document.getElementById('profile-model').value     = p.model;
   document.getElementById('profile-system-prompt').value = p.systemPrompt || '';
   document.getElementById('profile-stream').checked  = p.stream !== false;
+  document.getElementById('profile-thinking').checked = !!p.thinkingEnabled;
+  document.getElementById('profile-thinking-effort').value = p.thinkingEffort || 'high';
+  document.getElementById('thinking-effort-group').style.display = p.thinkingEnabled ? '' : 'none';
   openModal('profile-edit-overlay');
 }
 
@@ -198,6 +204,8 @@ function saveProfile() {
     model:            document.getElementById('profile-model').value.trim(),
     systemPrompt:     document.getElementById('profile-system-prompt').value,
     stream:           document.getElementById('profile-stream').checked,
+    thinkingEnabled:  document.getElementById('profile-thinking').checked,
+    thinkingEffort:   document.getElementById('profile-thinking-effort').value,
     // Keep params from existing or defaults
     temperature:      existing.temperature      ?? 0.7,
     maxTokens:        existing.maxTokens        ?? 2048,
@@ -257,6 +265,8 @@ function saveParams() {
   p.topP             = parseFloat(document.getElementById('cfg-top-p').value);
   p.frequencyPenalty = parseFloat(document.getElementById('cfg-freq-pen').value);
   p.presencePenalty  = parseFloat(document.getElementById('cfg-pres-pen').value);
+  p.thinkingEnabled  = document.getElementById('cfg-thinking').checked;
+  p.thinkingEffort   = document.getElementById('cfg-thinking-effort').value;
   saveState();
   closeModal('settings-overlay');
   toast('参数已保存 ✓', 'success');
@@ -481,6 +491,16 @@ function bindEvents() {
   /* Profile management */
   document.getElementById('new-profile-btn').addEventListener('click', openNewProfile);
   document.getElementById('save-profile-btn').addEventListener('click', saveProfile);
+
+  /* Thinking toggle — profile edit form */
+  document.getElementById('profile-thinking').addEventListener('change', function () {
+    document.getElementById('thinking-effort-group').style.display = this.checked ? '' : 'none';
+  });
+
+  /* Thinking toggle — parameters tab */
+  document.getElementById('cfg-thinking').addEventListener('change', function () {
+    document.getElementById('cfg-thinking-effort-group').style.display = this.checked ? '' : 'none';
+  });
 
   /* Edit message modal */
   document.getElementById('edit-save-only-btn').addEventListener('click', () => {
