@@ -156,9 +156,9 @@ function openNewProfile() {
   document.getElementById('profile-edit-title').textContent = '新建 API 方案';
   document.getElementById('profile-edit-id').value = '';
   document.getElementById('profile-name').value = '';
-  document.getElementById('profile-endpoint').value = 'https://api.openai.com/v1/chat/completions';
+  document.getElementById('profile-endpoint').value = 'https://api.deepseek.com/chat/completions';
   document.getElementById('profile-apikey').value = '';
-  document.getElementById('profile-model').value = 'gpt-4o';
+  document.getElementById('profile-model').value = 'deepseek-v4-flash';
   document.getElementById('profile-system-prompt').value = '';
   document.getElementById('profile-stream').checked = true;
   openModal('profile-edit-overlay');
@@ -311,19 +311,19 @@ function switchAtForkPoint(groupIds, activeBranchId, direction, divIdx) {
   saveState();
 
   const container = document.getElementById('messages-container');
-  const scroll = container.scrollTop;
-  const ver = getCurVer();
-  const newFps = getAllForkPoints(conv);
 
   // ① Refresh all existing switchers in-place (labels / disabled state may change)
+  const ver = getCurVer();
+  const newFps = getAllForkPoints(conv);
   const fpByIdx = new Map(newFps.map(fp => [fp.divIdx, fp]));
   for (const sw of container.querySelectorAll('.version-switcher-inline')) {
     const fp = fpByIdx.get(+sw.dataset.divIdx);
     if (fp) refreshSwitcher(sw, fp);
   }
 
-  // ② Remove message divIdx (only if old version had one), the clicked switcher, and everything after
+  // ② Pin the clicked switcher's screen position, then remove & rebuild
   const target = container.querySelector(`.version-switcher-inline[data-div-idx="${divIdx}"]`);
+  const pinOffset = target ? target.getBoundingClientRect().top : 0;
   if (target) {
     while (container.lastChild !== target) container.removeChild(container.lastChild);
     container.removeChild(target);
@@ -343,7 +343,11 @@ function switchAtForkPoint(groupIds, activeBranchId, direction, divIdx) {
   for (let i = cursor; i < ver.messages.length; i++)
     appendMsgElement(ver.messages[i], i);
 
-  container.scrollTop = scroll;
+  // ③ Scroll so the new switcher at this divIdx stays at the same screen position
+  const newTarget = container.querySelector(`.version-switcher-inline[data-div-idx="${divIdx}"]`);
+  if (newTarget) {
+    container.scrollTop = container.scrollTop + (newTarget.getBoundingClientRect().top - pinOffset);
+  }
 }
 
 function switchToSiblingVersion(direction) {
