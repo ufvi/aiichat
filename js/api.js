@@ -160,7 +160,6 @@ async function sendMessage(userText, isResumeVersion = false) {
         aiMsg.content = fullContent;
         aiMsg.reasoning = fullReasoning;
         if (bodyEl) bodyEl.innerHTML = buildMsgBodyHTML(fullContent, fullReasoning, true);
-        scrollToBottom();
       });
       fullContent = result.content;
       fullReasoning = result.reasoning || '';
