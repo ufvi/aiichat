@@ -4,33 +4,27 @@
    MODEL SUGGESTIONS
 ══════════════════════════ */
 const MODEL_SUGGESTIONS = [
-  { model: 'gpt-4o',                  provider: 'OpenAI' },
-  { model: 'gpt-4o-mini',             provider: 'OpenAI' },
-  { model: 'gpt-4-turbo',             provider: 'OpenAI' },
-  { model: 'gpt-3.5-turbo',           provider: 'OpenAI' },
-  { model: 'o1',                       provider: 'OpenAI' },
-  { model: 'o1-mini',                  provider: 'OpenAI' },
-  { model: 'o3-mini',                  provider: 'OpenAI' },
-  { model: 'claude-opus-4-5',          provider: 'Anthropic' },
-  { model: 'claude-sonnet-4-5',        provider: 'Anthropic' },
-  { model: 'claude-haiku-4-5',         provider: 'Anthropic' },
-  { model: 'gemini-2.0-flash',         provider: 'Google' },
-  { model: 'gemini-1.5-pro',           provider: 'Google' },
-  { model: 'gemini-1.5-flash',         provider: 'Google' },
-  { model: 'deepseek-v4-flash',         provider: 'DeepSeek' },
-  { model: 'deepseek-v4-pro',           provider: 'DeepSeek' },
-  { model: 'mistral-large-latest',     provider: 'Mistral' },
-  { model: 'mistral-small-latest',     provider: 'Mistral' },
-  { model: 'open-mixtral-8x7b',        provider: 'Mistral' },
-  { model: 'llama-3.3-70b-versatile',  provider: 'Groq' },
-  { model: 'qwen-max',                 provider: 'Alibaba' },
-  { model: 'qwen-plus',                provider: 'Alibaba' },
-  { model: 'qwen-turbo',               provider: 'Alibaba' },
+  { model: 'gpt-4o', provider: 'OpenAI' },
+  { model: 'gpt-4o-mini', provider: 'OpenAI' },
+  { model: 'gpt-4-turbo', provider: 'OpenAI' },
+  { model: 'o1-mini', provider: 'OpenAI' },
+  { model: 'o3-mini', provider: 'OpenAI' },
+  { model: 'claude-opus-4-5', provider: 'Anthropic' },
+  { model: 'claude-sonnet-4-5', provider: 'Anthropic' },
+  { model: 'claude-haiku-4-5', provider: 'Anthropic' },
+  { model: 'gemini-3.0-flash', provider: 'Google' },
+  { model: 'deepseek-v4-flash', provider: 'DeepSeek' },
+  { model: 'deepseek-v4-pro', provider: 'DeepSeek' },
+  { model: 'mistral-large-latest', provider: 'Mistral' },
+  { model: 'mistral-small-latest', provider: 'Mistral' },
+  { model: 'qwen-max', provider: 'Alibaba' },
+  { model: 'qwen-plus', provider: 'Alibaba' },
+  { model: 'qwen-turbo', provider: 'Alibaba' },
 ];
 
 function initCombobox(inputId, listId) {
   const input = document.getElementById(inputId);
-  const list  = document.getElementById(listId);
+  const list = document.getElementById(listId);
   if (!input || !list) return;
 
   function showSuggestions(filter) {
@@ -49,7 +43,7 @@ function initCombobox(inputId, listId) {
 
   input.addEventListener('focus', () => showSuggestions(input.value));
   input.addEventListener('input', () => showSuggestions(input.value));
-  input.addEventListener('blur',  () => setTimeout(() => list.classList.remove('open'), 160));
+  input.addEventListener('blur', () => setTimeout(() => list.classList.remove('open'), 160));
   list.addEventListener('mousedown', e => {
     const item = e.target.closest('.suggestion-item');
     if (item) { input.value = item.dataset.model; list.classList.remove('open'); }
@@ -61,11 +55,11 @@ function initCombobox(inputId, listId) {
 ══════════════════════════ */
 function initSliders() {
   [
-    ['cfg-temp',       'cfg-temp-val'],
+    ['cfg-temp', 'cfg-temp-val'],
     ['cfg-max-tokens', 'cfg-max-tokens-val'],
-    ['cfg-top-p',      'cfg-top-p-val'],
-    ['cfg-freq-pen',   'cfg-freq-pen-val'],
-    ['cfg-pres-pen',   'cfg-pres-pen-val'],
+    ['cfg-top-p', 'cfg-top-p-val'],
+    ['cfg-freq-pen', 'cfg-freq-pen-val'],
+    ['cfg-pres-pen', 'cfg-pres-pen-val'],
   ].forEach(([sId, vId]) => {
     const sl = document.getElementById(sId);
     const vl = document.getElementById(vId);
@@ -137,9 +131,9 @@ function initModals() {
 function initTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const tabId  = btn.dataset.tab;
-      const modal  = btn.closest('.modal, .tabs')?.closest('.modal') || btn.closest('.modal');
-      const scope  = modal || document;
+      const tabId = btn.dataset.tab;
+      const modal = btn.closest('.modal, .tabs')?.closest('.modal') || btn.closest('.modal');
+      const scope = modal || document;
       scope.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       scope.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
@@ -157,13 +151,13 @@ let editingProfileId = null;
 function openNewProfile() {
   editingProfileId = null;
   document.getElementById('profile-edit-title').textContent = '新建 API 方案';
-  document.getElementById('profile-edit-id').value   = '';
-  document.getElementById('profile-name').value      = '';
-  document.getElementById('profile-endpoint').value  = 'https://api.openai.com/v1/chat/completions';
-  document.getElementById('profile-apikey').value    = '';
-  document.getElementById('profile-model').value     = 'gpt-4o';
+  document.getElementById('profile-edit-id').value = '';
+  document.getElementById('profile-name').value = '';
+  document.getElementById('profile-endpoint').value = 'https://api.openai.com/v1/chat/completions';
+  document.getElementById('profile-apikey').value = '';
+  document.getElementById('profile-model').value = 'gpt-4o';
   document.getElementById('profile-system-prompt').value = '';
-  document.getElementById('profile-stream').checked  = true;
+  document.getElementById('profile-stream').checked = true;
   document.getElementById('profile-thinking').checked = false;
   document.getElementById('profile-thinking-effort').value = 'high';
   document.getElementById('thinking-effort-group').style.display = 'none';
@@ -175,13 +169,13 @@ function openEditProfile(profileId) {
   if (!p) return;
   editingProfileId = profileId;
   document.getElementById('profile-edit-title').textContent = `编辑方案「${p.name}」`;
-  document.getElementById('profile-edit-id').value   = p.id;
-  document.getElementById('profile-name').value      = p.name;
-  document.getElementById('profile-endpoint').value  = p.endpoint;
-  document.getElementById('profile-apikey').value    = p.apiKey;
-  document.getElementById('profile-model').value     = p.model;
+  document.getElementById('profile-edit-id').value = p.id;
+  document.getElementById('profile-name').value = p.name;
+  document.getElementById('profile-endpoint').value = p.endpoint;
+  document.getElementById('profile-apikey').value = p.apiKey;
+  document.getElementById('profile-model').value = p.model;
   document.getElementById('profile-system-prompt').value = p.systemPrompt || '';
-  document.getElementById('profile-stream').checked  = p.stream !== false;
+  document.getElementById('profile-stream').checked = p.stream !== false;
   document.getElementById('profile-thinking').checked = !!p.thinkingEnabled;
   document.getElementById('profile-thinking-effort').value = p.thinkingEffort || 'high';
   document.getElementById('thinking-effort-group').style.display = p.thinkingEnabled ? '' : 'none';
@@ -199,19 +193,19 @@ function saveProfile() {
     ...existing,
     id,
     name,
-    endpoint:         document.getElementById('profile-endpoint').value.trim(),
-    apiKey:           document.getElementById('profile-apikey').value.trim(),
-    model:            document.getElementById('profile-model').value.trim(),
-    systemPrompt:     document.getElementById('profile-system-prompt').value,
-    stream:           document.getElementById('profile-stream').checked,
-    thinkingEnabled:  document.getElementById('profile-thinking').checked,
-    thinkingEffort:   document.getElementById('profile-thinking-effort').value,
+    endpoint: document.getElementById('profile-endpoint').value.trim(),
+    apiKey: document.getElementById('profile-apikey').value.trim(),
+    model: document.getElementById('profile-model').value.trim(),
+    systemPrompt: document.getElementById('profile-system-prompt').value,
+    stream: document.getElementById('profile-stream').checked,
+    thinkingEnabled: document.getElementById('profile-thinking').checked,
+    thinkingEffort: document.getElementById('profile-thinking-effort').value,
     // Keep params from existing or defaults
-    temperature:      existing.temperature      ?? 0.7,
-    maxTokens:        existing.maxTokens        ?? 2048,
-    topP:             existing.topP             ?? 1,
+    temperature: existing.temperature ?? 0.7,
+    maxTokens: existing.maxTokens ?? 2048,
+    topP: existing.topP ?? 1,
     frequencyPenalty: existing.frequencyPenalty ?? 0,
-    presencePenalty:  existing.presencePenalty  ?? 0,
+    presencePenalty: existing.presencePenalty ?? 0,
   };
 
   if (!editingProfileId) {
@@ -260,13 +254,13 @@ function deleteProfile(profileId) {
 function saveParams() {
   const p = getActiveProfile();
   if (!p) return;
-  p.temperature      = parseFloat(document.getElementById('cfg-temp').value);
-  p.maxTokens        = parseInt(document.getElementById('cfg-max-tokens').value);
-  p.topP             = parseFloat(document.getElementById('cfg-top-p').value);
+  p.temperature = parseFloat(document.getElementById('cfg-temp').value);
+  p.maxTokens = parseInt(document.getElementById('cfg-max-tokens').value);
+  p.topP = parseFloat(document.getElementById('cfg-top-p').value);
   p.frequencyPenalty = parseFloat(document.getElementById('cfg-freq-pen').value);
-  p.presencePenalty  = parseFloat(document.getElementById('cfg-pres-pen').value);
-  p.thinkingEnabled  = document.getElementById('cfg-thinking').checked;
-  p.thinkingEffort   = document.getElementById('cfg-thinking-effort').value;
+  p.presencePenalty = parseFloat(document.getElementById('cfg-pres-pen').value);
+  p.thinkingEnabled = document.getElementById('cfg-thinking').checked;
+  p.thinkingEffort = document.getElementById('cfg-thinking-effort').value;
   saveState();
   closeModal('settings-overlay');
   toast('参数已保存 ✓', 'success');
@@ -275,6 +269,79 @@ function saveParams() {
 /* ══════════════════════════
    MESSAGE ACTIONS (global, called from inline onclick)
 ══════════════════════════ */
+/**
+ * Switch version at a specific fork point.
+ * groupIds: array of version ids in the fork group (ordered)
+ * activeBranchId: the currently active branch id at this fork level
+ * direction: -1 or +1
+ *
+ * When switching to a branch that is the parent version (not a fork child),
+ * we simply navigate to that version. When switching to a child branch,
+ * we navigate to that child. This preserves whatever sub-selections exist
+ * within each branch independently.
+ */
+function switchAtForkPoint(groupIds, activeBranchId, direction, divIdx) {
+  const conv = getConv();
+  if (!conv) return;
+
+  const curIdx = groupIds.indexOf(activeBranchId);
+  if (curIdx < 0) return;
+  const newIdx = curIdx + direction;
+  if (newIdx < 0 || newIdx >= groupIds.length) return;
+
+  const targetId = groupIds[newIdx];
+  if (!conv.versions[targetId]) return;
+
+  const oldLen = getCurVer()?.messages.length || 0;
+  conv.currentVersionId = targetId;
+  saveState();
+
+  const container = document.getElementById('messages-container');
+  const scroll = container.scrollTop;
+  const ver = getCurVer();
+  const newFps = getAllForkPoints(conv);
+
+  // ① Refresh all existing switchers in-place (labels / disabled state may change)
+  const fpByIdx = new Map(newFps.map(fp => [fp.divIdx, fp]));
+  for (const sw of container.querySelectorAll('.version-switcher-inline')) {
+    const fp = fpByIdx.get(+sw.dataset.divIdx);
+    if (fp) refreshSwitcher(sw, fp);
+  }
+
+  // ② Remove message divIdx (only if old version had one), the clicked switcher, and everything after
+  const target = container.querySelector(`.version-switcher-inline[data-div-idx="${divIdx}"]`);
+  if (target) {
+    while (container.lastChild !== target) container.removeChild(container.lastChild);
+    container.removeChild(target);
+    if (oldLen > divIdx) {
+      const msgEl = container.lastChild;
+      if (msgEl && msgEl.classList.contains('msg-wrapper')) container.removeChild(msgEl);
+    }
+  }
+
+  let cursor = divIdx;
+  for (const fp of newFps.filter(fp => fp.divIdx >= divIdx)) {
+    for (let i = cursor; i <= fp.divIdx && i < ver.messages.length; i++)
+      appendMsgElement(ver.messages[i], i);
+    cursor = Math.max(cursor, fp.divIdx + 1);
+    appendInlineVersionSwitcher(conv, fp.forkGroup, fp.activeBranchId, fp.divIdx);
+  }
+  for (let i = cursor; i < ver.messages.length; i++)
+    appendMsgElement(ver.messages[i], i);
+
+  container.scrollTop = scroll;
+}
+
+function switchToSiblingVersion(direction) {
+  const conv = getConv();
+  if (!conv) return;
+  const pts = getAllForkPoints(conv);
+  if (pts.length === 0) return;
+  // Navigate at the deepest (last) fork point
+  const deepest = pts[pts.length - 1];
+  switchAtForkPoint(deepest.forkGroup.map(v => v.id), deepest.activeBranchId, direction, deepest.divIdx);
+}
+
 function copyMsg(msgId) {
   const ver = getCurVer();
   if (!ver) return;
@@ -283,11 +350,48 @@ function copyMsg(msgId) {
 }
 
 function deleteMsg(msgId) {
+  if (!confirm('确定删除此消息？')) return;
+  const conv = getConv();
   const ver = getCurVer();
-  if (!ver) return;
+  if (!conv || !ver) return;
   const idx = ver.messages.findIndex(m => m.id === msgId);
   if (idx < 0) return;
-  ver.messages.splice(idx, 1);
+
+  // Delete from all versions that share this message at the same index
+  for (const v of Object.values(conv.versions)) {
+    if (v.messages[idx] && v.messages[idx].id === msgId) {
+      v.messages.splice(idx, 1);
+    }
+  }
+
+  // Remove redundant versions (empty, or subset of another version without own children)
+  const allVers = () => Object.values(conv.versions);
+  for (const v of allVers()) {
+    if (v.messages.length === 0) {
+      // Empty version — delete it
+      if (allVers().length <= 1) break; // keep at least one
+      delete conv.versions[v.id];
+      if (conv.currentVersionId === v.id) {
+        conv.currentVersionId = allVers()[0]?.id || null;
+      }
+      continue;
+    }
+    // If v is a prefix of another version and has no children, remove it
+    const hasChildren = allVers().some(o => o.parentVersionId === v.id);
+    if (hasChildren) continue;
+    const container = allVers().find(o =>
+      o.id !== v.id &&
+      o.messages.length >= v.messages.length &&
+      v.messages.every((m, i) => o.messages[i] && o.messages[i].id === m.id)
+    );
+    if (container) {
+      delete conv.versions[v.id];
+      if (conv.currentVersionId === v.id) {
+        conv.currentVersionId = container.id;
+      }
+    }
+  }
+
   saveState();
   renderChat();
   toast('已删除', 'info');
@@ -298,7 +402,7 @@ let editCtx = null;
 
 function editMsg(msgId) {
   const conv = getConv();
-  const ver  = getCurVer();
+  const ver = getCurVer();
   if (!conv || !ver) return;
   const idx = ver.messages.findIndex(m => m.id === msgId);
   if (idx < 0) return;
@@ -309,7 +413,7 @@ function editMsg(msgId) {
 
 function regenMsg(msgId) {
   const conv = getConv();
-  const ver  = getCurVer();
+  const ver = getCurVer();
   if (!conv || !ver || isStreaming) return;
   const idx = ver.messages.findIndex(m => m.id === msgId);
   if (idx < 0) return;
@@ -341,10 +445,10 @@ function importData(file) {
     try {
       const data = JSON.parse(ev.target.result);
       if (!data.conversations) { toast('文件格式不正确', 'error'); return; }
-      state.conversations         = data.conversations || {};
-      state.apiProfiles           = data.apiProfiles   || {};
-      state.currentProfileId      = data.currentProfileId || null;
-      state.webdavConfig          = data.webdavConfig  || state.webdavConfig;
+      state.conversations = data.conversations || {};
+      state.apiProfiles = data.apiProfiles || {};
+      state.currentProfileId = data.currentProfileId || null;
+      state.webdavConfig = data.webdavConfig || state.webdavConfig;
       state.currentConversationId = null;
       ensureDefaultProfile();
       saveState();
@@ -424,32 +528,23 @@ function bindEvents() {
   });
 
   /* Input textarea */
+  const isDesktop = window.matchMedia('(pointer: fine)').matches;
   const ta = document.getElementById('message-input');
+  if (isDesktop) {
+    ta.placeholder = '输入消息… (Enter 发送, Shift+Enter 换行)';
+    document.querySelector('.input-hint').textContent = 'Enter 发送 · Shift+Enter 换行';
+  }
   ta.addEventListener('input', () => autoResize(ta));
   ta.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.ctrlKey) {
-      e.preventDefault();
-      document.getElementById('send-btn').click();
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (isDesktop) {
+        e.preventDefault();
+        document.getElementById('send-btn').click();
+      } else if (e.ctrlKey) {
+        e.preventDefault();
+        document.getElementById('send-btn').click();
+      }
     }
-  });
-
-  /* Version selector */
-  document.getElementById('version-btn').addEventListener('click', e => {
-    e.stopPropagation();
-    document.getElementById('version-dropdown').classList.toggle('open');
-  });
-  document.addEventListener('click', () => {
-    document.getElementById('version-dropdown').classList.remove('open');
-  });
-  document.getElementById('version-dropdown').addEventListener('click', e => {
-    const item = e.target.closest('.ver-item');
-    if (!item) return;
-    const conv = getConv();
-    if (conv) {
-      conv.currentVersionId = item.dataset.verId;
-      saveState(); renderChat();
-    }
-    document.getElementById('version-dropdown').classList.remove('open');
   });
 
   /* Add message button */
@@ -460,9 +555,9 @@ function bindEvents() {
   });
   document.getElementById('addmsg-confirm-btn').addEventListener('click', () => {
     const conv = getConv();
-    const ver  = getCurVer();
+    const ver = getCurVer();
     if (!conv || !ver) return;
-    const role    = document.querySelector('input[name="add-role"]:checked')?.value || 'user';
+    const role = document.querySelector('input[name="add-role"]:checked')?.value || 'user';
     const content = document.getElementById('addmsg-content').value.trim();
     if (!content) { toast('请输入消息内容', 'error'); return; }
     const msg = { id: 'msg_' + uid(), role, content, timestamp: now() };
@@ -506,7 +601,7 @@ function bindEvents() {
   document.getElementById('edit-save-only-btn').addEventListener('click', () => {
     if (!editCtx) return;
     const conv = state.conversations[editCtx.convId];
-    const ver  = conv?.versions[editCtx.versionId];
+    const ver = conv?.versions[editCtx.versionId];
     if (!ver) return;
     ver.messages[editCtx.msgIndex].content = document.getElementById('edit-content').value;
     saveState(); renderChat();
@@ -516,7 +611,7 @@ function bindEvents() {
   document.getElementById('edit-save-send-btn').addEventListener('click', () => {
     if (!editCtx || isStreaming) return;
     const conv = state.conversations[editCtx.convId];
-    const ver  = conv?.versions[editCtx.versionId];
+    const ver = conv?.versions[editCtx.versionId];
     if (!ver) return;
 
     const newContent = document.getElementById('edit-content').value;

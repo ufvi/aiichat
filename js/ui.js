@@ -40,27 +40,43 @@ function renderChat() {
   const msgEl  = document.getElementById('messages-container');
 
   document.getElementById('chat-title').textContent = conv ? conv.title : '未选择对话';
-  document.getElementById('version-btn').style.display  = conv ? '' : 'none';
   document.getElementById('add-msg-btn').style.display  = conv ? '' : 'none';
 
   if (!conv) {
     msgEl.innerHTML = '<div class="empty-state"><div class="empty-icon">💬</div><p>选择或新建对话，开始聊天</p></div>';
-    document.getElementById('ver-label-text').textContent = '—';
     return;
   }
 
   const ver = getCurVer();
-  document.getElementById('ver-label-text').textContent = ver ? ver.label : '—';
 
   if (!ver || ver.messages.length === 0) {
     msgEl.innerHTML = '<div class="empty-state"><div class="empty-icon">✨</div><p>发送消息开始对话</p></div>';
-    renderVersionSelector();
     return;
   }
 
   msgEl.innerHTML = '';
-  ver.messages.forEach((m, i) => appendMsgElement(m, i));
-  renderVersionSelector();
+
+  const forkPoints = getAllForkPoints(conv);
+
+  if (forkPoints.length === 0) {
+    // No branching — render all messages normally
+    ver.messages.forEach((m, i) => appendMsgElement(m, i));
+  } else {
+    // Render messages interleaved with switchers at each fork point (sorted top-to-bottom)
+    let cursor = 0;
+    for (const fp of forkPoints) {
+      for (let i = cursor; i <= fp.divIdx && i < ver.messages.length; i++) {
+        appendMsgElement(ver.messages[i], i);
+      }
+      cursor = Math.max(cursor, fp.divIdx + 1);
+      appendInlineVersionSwitcher(conv, fp.forkGroup, fp.activeBranchId, fp.divIdx);
+    }
+    // Render remaining messages after the last fork point
+    for (let i = cursor; i < ver.messages.length; i++) {
+      appendMsgElement(ver.messages[i], i);
+    }
+  }
+
   scrollToBottom();
 }
 
@@ -87,6 +103,83 @@ function appendMsgElement(msg, idx, isStreamingPlaceholder = false) {
   return wrap;
 }
 
+function appendInlineVersionSwitcher(conv, forkGroup, activeBranchId, divIdx) {
+  const container = document.getElementById('messages-container');
+  const empty = container.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  const activeIdx = forkGroup.findIndex(v => v.id === activeBranchId);
+  if (activeIdx < 0) return null;
+
+  const isFirst = activeIdx === 0;
+  const isLast  = activeIdx === forkGroup.length - 1;
+  const groupIds  = forkGroup.map(v => v.id); // plain array — no HTML encoding needed
+
+  const wrap = document.createElement('div');
+  wrap.className = 'version-switcher-inline';
+  wrap.dataset.divIdx = divIdx;
+  wrap.dataset.groupIds = JSON.stringify(groupIds);
+  wrap.dataset.activeBranchId = activeBranchId;
+
+  const prevBtn = document.createElement('button');
+  prevBtn.className   = 'ver-switch-arrow';
+  prevBtn.title       = isFirst ? '已是第一个分支' : '上一个分支';
+  prevBtn.textContent = '◀';
+  prevBtn.disabled    = isFirst;
+  prevBtn.addEventListener('click', () => switchAtForkPoint(groupIds, activeBranchId, -1, divIdx));
+
+  const infoDiv = document.createElement('div');
+  infoDiv.className = 'ver-switch-info';
+
+  const labelSpan = document.createElement('span');
+  labelSpan.className   = 'ver-switch-label';
+  labelSpan.textContent = activeIdx + 1;
+
+  const sepSpan = document.createElement('span');
+  sepSpan.className   = 'ver-switch-sep';
+  sepSpan.textContent = '/';
+
+  const totalSpan = document.createElement('span');
+  totalSpan.className   = 'ver-switch-total';
+  totalSpan.textContent = forkGroup.length;
+
+  infoDiv.append(labelSpan, sepSpan, totalSpan);
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className   = 'ver-switch-arrow';
+  nextBtn.title       = isLast ? '已是最后一个分支' : '下一个分支';
+  nextBtn.textContent = '▶';
+  nextBtn.disabled    = isLast;
+  nextBtn.addEventListener('click', () => switchAtForkPoint(groupIds, activeBranchId, 1, divIdx));
+
+  wrap.append(prevBtn, infoDiv, nextBtn);
+  container.appendChild(wrap);
+  return wrap;
+}
+
+function refreshSwitcher(wrap, fp) {
+  const { forkGroup, activeBranchId, divIdx } = fp;
+  const activeIdx = forkGroup.findIndex(v => v.id === activeBranchId);
+  if (activeIdx < 0) return;
+  const groupIds = forkGroup.map(v => v.id);
+  const isFirst = activeIdx === 0, isLast = activeIdx === forkGroup.length - 1;
+
+  wrap.dataset.groupIds = JSON.stringify(groupIds);
+  wrap.dataset.activeBranchId = activeBranchId;
+  wrap.querySelector('.ver-switch-label').textContent = activeIdx + 1;
+  wrap.querySelector('.ver-switch-total').textContent = forkGroup.length;
+
+  const mkBtn = (text, dir, disabled, title) => {
+    const b = document.createElement('button');
+    b.className = 'ver-switch-arrow'; b.textContent = text;
+    b.disabled = disabled; b.title = title;
+    b.addEventListener('click', () => switchAtForkPoint(groupIds, activeBranchId, dir, divIdx));
+    return b;
+  };
+  wrap.firstChild.replaceWith(mkBtn('◀', -1, isFirst, isFirst ? '已是第一个分支' : '上一个分支'));
+  wrap.lastChild.replaceWith(mkBtn('▶',  1, isLast,  isLast  ? '已是最后一个分支' : '下一个分支'));
+}
+
 function buildActionBtns(msg) {
   const id = msg.id;
   let html = `<button class="msg-action-btn" onclick="copyMsg('${id}')">⎘ 复制</button>`;
@@ -96,29 +189,6 @@ function buildActionBtns(msg) {
   }
   html    += `<button class="msg-action-btn danger" onclick="deleteMsg('${id}')">✕</button>`;
   return html;
-}
-
-/* ─── Version selector dropdown ─── */
-function renderVersionSelector() {
-  const conv = getConv();
-  const dd   = document.getElementById('version-dropdown');
-  if (!conv) { dd.innerHTML = ''; return; }
-
-  const vers = Object.values(conv.versions)
-    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
-
-  dd.innerHTML = vers.map(v => {
-    const isActive = v.id === conv.currentVersionId;
-    const parent   = v.parentVersionId ? conv.versions[v.parentVersionId] : null;
-    return `<div class="ver-item ${isActive ? 'active' : ''}" data-ver-id="${v.id}">
-      <span class="ver-label">${v.label}</span>
-      <div class="ver-info">
-        <strong>${v.messages.length} 条消息</strong>
-        <span>${parent ? '分叉自 ' + parent.label : '主线'} · ${fmtTime(v.createdAt)}</span>
-      </div>
-      ${isActive ? '<span style="color:var(--accent);font-size:11px">●</span>' : ''}
-    </div>`;
-  }).join('');
 }
 
 /* ─── Profile list (in settings) ─── */

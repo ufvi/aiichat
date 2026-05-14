@@ -54,10 +54,6 @@
     font-size: 13px;
   }
 
-  /* Simplify version button on mobile */
-  .ver-prefix { display: none; }
-  #version-btn { padding: 4px 8px; gap: 4px; }
-
   /* Messages */
   #messages-container {
     padding: 10px 10px;
@@ -76,6 +72,14 @@
   .msg-action-btn {
     padding: 5px 10px;
     font-size: 12px;
+  }
+
+  /* Inline version switcher */
+  .version-switcher-inline {
+    gap: 10px; padding: 6px 12px; font-size: 11px;
+  }
+  .ver-switch-arrow {
+    padding: 6px 14px; font-size: 15px; min-height: 36px;
   }
 
   /* Input area */
@@ -140,13 +144,6 @@
   /* Conv delete always visible on mobile */
   .conv-delete { opacity: 1; }
 
-  /* Version dropdown */
-  #version-dropdown {
-    right: auto;
-    left: 0;
-    min-width: 200px;
-  }
-
   /* Modal footer buttons stack */
   .modal-footer {
     flex-wrap: wrap;
@@ -163,7 +160,6 @@
 @media (max-width: 380px) {
   #sidebar { width: 85vw; }
   .msg-action-btn span { display: none; }
-  #version-btn { gap: 3px; padding: 4px 6px; }
 }
 
 /* ─── iOS safe area ─── */

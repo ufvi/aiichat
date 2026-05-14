@@ -143,10 +143,20 @@ async function sendMessage(userText, isResumeVersion = false) {
     // Add AI placeholder
     const aiMsg = { id: 'msg_' + uid(), role: 'assistant', content: '', timestamp: now() };
     ver.messages.push(aiMsg);
-    const placeholder = appendMsgElement(aiMsg, ver.messages.length - 1, true);
-    const bodyEl = placeholder ? placeholder.querySelector('.msg-body') : null;
+    let placeholder = appendMsgElement(aiMsg, ver.messages.length - 1, true);
+    let bodyEl = placeholder ? placeholder.querySelector('.msg-body') : null;
     if (bodyEl) { bodyEl.innerHTML = ''; bodyEl.classList.add('streaming'); }
     scrollToBottom();
+
+    // For resume (regen / edit-send): re-render so fork points account for the new placeholder
+    if (isResumeVersion) {
+      renderChat();
+      placeholder = document.getElementById('messages-container')
+        .querySelector(`.msg-wrapper[data-msg-id="${aiMsg.id}"]`);
+      bodyEl = placeholder ? placeholder.querySelector('.msg-body') : null;
+      if (bodyEl) { bodyEl.innerHTML = ''; bodyEl.classList.add('streaming'); }
+      scrollToBottom();
+    }
 
     // Messages to send (exclude streaming placeholder)
     const msgsForAPI = ver.messages.slice(0, -1);
@@ -168,11 +178,12 @@ async function sendMessage(userText, isResumeVersion = false) {
         toast('已停止生成', 'info');
       } else {
         toast('API 错误：' + err.message, 'error');
-        ver.messages.pop();
-        if (placeholder) placeholder.remove();
+        aiMsg.content = '[生成失败] ' + err.message;
+        aiMsg.reasoning = '';
         isStreaming = false;
         setSendingState(false);
         saveState();
+        renderChat();
         renderConvList();
         return;
       }
@@ -189,7 +200,6 @@ async function sendMessage(userText, isResumeVersion = false) {
 
     saveState();
     renderConvList();
-    renderVersionSelector();
   } finally {
     isStreaming = false;
     setSendingState(false);
