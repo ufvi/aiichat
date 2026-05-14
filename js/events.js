@@ -139,6 +139,9 @@ function initTabs() {
       btn.classList.add('active');
       const panel = document.getElementById(tabId);
       if (panel) panel.classList.add('active');
+      // Show params footer buttons only on the params tab
+      const ftBtns = document.getElementById('params-footer-btns');
+      if (ftBtns) ftBtns.style.display = tabId === 'tab-params' ? '' : 'none';
     });
   });
 }
@@ -158,9 +161,6 @@ function openNewProfile() {
   document.getElementById('profile-model').value = 'gpt-4o';
   document.getElementById('profile-system-prompt').value = '';
   document.getElementById('profile-stream').checked = true;
-  document.getElementById('profile-thinking').checked = false;
-  document.getElementById('profile-thinking-effort').value = 'high';
-  document.getElementById('thinking-effort-group').style.display = 'none';
   openModal('profile-edit-overlay');
 }
 
@@ -176,9 +176,6 @@ function openEditProfile(profileId) {
   document.getElementById('profile-model').value = p.model;
   document.getElementById('profile-system-prompt').value = p.systemPrompt || '';
   document.getElementById('profile-stream').checked = p.stream !== false;
-  document.getElementById('profile-thinking').checked = !!p.thinkingEnabled;
-  document.getElementById('profile-thinking-effort').value = p.thinkingEffort || 'high';
-  document.getElementById('thinking-effort-group').style.display = p.thinkingEnabled ? '' : 'none';
   openModal('profile-edit-overlay');
 }
 
@@ -198,8 +195,8 @@ function saveProfile() {
     model: document.getElementById('profile-model').value.trim(),
     systemPrompt: document.getElementById('profile-system-prompt').value,
     stream: document.getElementById('profile-stream').checked,
-    thinkingEnabled: document.getElementById('profile-thinking').checked,
-    thinkingEffort: document.getElementById('profile-thinking-effort').value,
+    thinkingEnabled: existing.thinkingEnabled ?? false,
+    thinkingEffort: existing.thinkingEffort ?? 'high',
     // Keep params from existing or defaults
     temperature: existing.temperature ?? 0.7,
     maxTokens: existing.maxTokens ?? 2048,
@@ -228,6 +225,7 @@ function switchToProfile(profileId) {
   renderProfileList();
   renderSidebarProfile();
   renderApiStatus();
+  loadParamsToForm();
   toast(`已切换到「${state.apiProfiles[profileId].name}」`, 'success');
 }
 
@@ -264,6 +262,22 @@ function saveParams() {
   saveState();
   closeModal('settings-overlay');
   toast('参数已保存 ✓', 'success');
+}
+
+function resetParams() {
+  if (!confirm('确定恢复默认参数？')) return;
+  const p = getActiveProfile();
+  if (!p) return;
+  p.temperature = 0.7;
+  p.maxTokens = 8192;
+  p.topP = 1;
+  p.frequencyPenalty = 0;
+  p.presencePenalty = 0;
+  p.thinkingEnabled = false;
+  p.thinkingEffort = 'high';
+  saveState();
+  loadParamsToForm();
+  toast('参数已恢复默认 ✓', 'success');
 }
 
 /* ══════════════════════════
@@ -582,15 +596,11 @@ function bindEvents() {
     document.querySelector('[data-tab="tab-profiles"]').click();
   });
   document.getElementById('save-params-btn').addEventListener('click', saveParams);
+  document.getElementById('reset-params-btn').addEventListener('click', resetParams);
 
   /* Profile management */
   document.getElementById('new-profile-btn').addEventListener('click', openNewProfile);
   document.getElementById('save-profile-btn').addEventListener('click', saveProfile);
-
-  /* Thinking toggle — profile edit form */
-  document.getElementById('profile-thinking').addEventListener('change', function () {
-    document.getElementById('thinking-effort-group').style.display = this.checked ? '' : 'none';
-  });
 
   /* Thinking toggle — parameters tab */
   document.getElementById('cfg-thinking').addEventListener('change', function () {
@@ -604,6 +614,7 @@ function bindEvents() {
     const ver = conv?.versions[editCtx.versionId];
     if (!ver) return;
     ver.messages[editCtx.msgIndex].content = document.getElementById('edit-content').value;
+    ver.messages[editCtx.msgIndex].id = 'msg_' + uid();
     saveState(); renderChat();
     closeModal('edit-overlay');
     toast('已保存 ✓', 'success');
@@ -616,7 +627,7 @@ function bindEvents() {
 
     const newContent = document.getElementById('edit-content').value;
     const base = ver.messages.slice(0, editCtx.msgIndex + 1);
-    base[editCtx.msgIndex] = { ...ver.messages[editCtx.msgIndex], content: newContent };
+    base[editCtx.msgIndex] = { ...ver.messages[editCtx.msgIndex], id: 'msg_' + uid(), content: newContent };
 
     state.currentConversationId = editCtx.convId;
     const newVer = forkVersion(conv, base, editCtx.versionId);

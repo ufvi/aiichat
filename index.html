@@ -118,11 +118,12 @@
       <div class="tab-panel" id="tab-params">
         <p class="tab-hint">以下参数应用于当前激活的 API 方案。</p>
         <div class="form-group">
-          <label class="form-label">Temperature <span class="form-label-hint">创意度 (0 → 2)</span></label>
+          <label class="form-label">Temperature <span class="form-label-hint">(0 → 2)</span></label>
           <div class="slider-row">
             <input type="range" id="cfg-temp" class="form-slider" min="0" max="2" step="0.05" value="0.7">
             <input type="number" id="cfg-temp-val" class="slider-value" min="0" max="2" step="0.05" value="0.7">
           </div>
+          <p class="field-hint">越高越有创意但可能跑题，越低越保守精确。</p>
         </div>
         <div class="form-group">
           <label class="form-label">Max Tokens <span class="form-label-hint">最大输出长度</span></label>
@@ -130,13 +131,15 @@
             <input type="range" id="cfg-max-tokens" class="form-slider" min="256" max="32768" step="256" value="2048">
             <input type="number" id="cfg-max-tokens-val" class="slider-value" min="256" max="32768" style="width:62px" value="2048">
           </div>
+          <p class="field-hint">生成回复的最大 token 数，超出会被截断。</p>
         </div>
         <div class="form-group">
-          <label class="form-label">Top P <span class="form-label-hint">概率裁剪 (0 → 1)</span></label>
+          <label class="form-label">Top P <span class="form-label-hint">(0 → 1)</span></label>
           <div class="slider-row">
             <input type="range" id="cfg-top-p" class="form-slider" min="0" max="1" step="0.05" value="1">
             <input type="number" id="cfg-top-p-val" class="slider-value" min="0" max="1" step="0.05" value="1">
           </div>
+          <p class="field-hint">核采样：仅从累积概率达 P 的 token 中选取，1 表示不做限制。</p>
         </div>
         <div class="form-group">
           <label class="form-label">Frequency Penalty <span class="form-label-hint">(-2 → 2)</span></label>
@@ -144,6 +147,7 @@
             <input type="range" id="cfg-freq-pen" class="form-slider" min="-2" max="2" step="0.05" value="0">
             <input type="number" id="cfg-freq-pen-val" class="slider-value" min="-2" max="2" step="0.05" value="0">
           </div>
+          <p class="field-hint">正值降低已出现词语的重复概率，减少啰嗦。</p>
         </div>
         <div class="form-group">
           <label class="form-label">Presence Penalty <span class="form-label-hint">(-2 → 2)</span></label>
@@ -151,6 +155,7 @@
             <input type="range" id="cfg-pres-pen" class="form-slider" min="-2" max="2" step="0.05" value="0">
             <input type="number" id="cfg-pres-pen-val" class="slider-value" min="-2" max="2" step="0.05" value="0">
           </div>
+          <p class="field-hint">正值鼓励模型引入新话题，减少重复已提及的内容。</p>
         </div>
         <hr class="divider">
         <div class="section-title">思考模式</div>
@@ -199,7 +204,10 @@
     </div>
     <div class="modal-footer">
       <button class="btn" data-close="settings-overlay">关闭</button>
-      <button class="btn btn-primary" id="save-params-btn">保存参数</button>
+      <span id="params-footer-btns" style="display:none">
+        <button class="btn" id="reset-params-btn">恢复默认</button>
+        <button class="btn btn-primary" id="save-params-btn">保存参数</button>
+      </span>
     </div>
   </div>
 </div>
@@ -241,21 +249,6 @@
           <input type="checkbox" id="profile-stream" checked>
           <span class="form-check-label">启用流式输出 (Streaming)</span>
         </label>
-      </div>
-      <div class="form-group">
-        <label class="form-check">
-          <input type="checkbox" id="profile-thinking">
-          <span class="form-check-label">启用思考模式 (Thinking)</span>
-        </label>
-      </div>
-      <div class="form-group" id="thinking-effort-group" style="display:none">
-        <label class="form-label">思考强度 <span class="form-label-hint">— 思考深度越高，推理越充分但耗时越长</span></label>
-        <select id="profile-thinking-effort" class="form-input">
-          <option value="low">Low — 快速推理</option>
-          <option value="medium">Medium — 平衡</option>
-          <option value="high" selected>High — 深度推理</option>
-          <option value="max">Max — 最大深度</option>
-        </select>
       </div>
     </div>
     <div class="modal-footer">

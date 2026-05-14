@@ -525,9 +525,15 @@ body { display: flex; height: 100vh; }
 }
 .form-slider::-webkit-slider-thumb:hover { box-shadow: 0 0 0 4px var(--accent-dim); }
 .slider-value {
-  width: 46px; background: var(--bg-1); border: 1px solid var(--border-mid);
+  width: 52px; background: var(--bg-1); border: 1px solid var(--border-mid);
   border-radius: 5px; padding: 4px 6px; text-align: center;
   font-size: 12px; font-family: var(--font-mono); color: var(--text-2); outline: none;
+  -moz-appearance: textfield;
+}
+.slider-value::-webkit-inner-spin-button,
+.slider-value::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Combobox */
