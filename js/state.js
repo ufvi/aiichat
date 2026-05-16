@@ -223,31 +223,88 @@ function autoTitle(conv, firstUserMsg) {
 /* ─── Import merge ─── */
 
 /**
+ * Compare only the substantive content of two conversations
+ * (title + versions' messages), ignoring IDs and timestamps.
+ * Two conversations are "the same content" if they have the same
+ * version labels and identical messages (role + content) in each version.
+ */
+function profileContentEqual(a, b) {
+  // Compare all config fields except `id`
+  const keys = ['name', 'endpoint', 'apiKey', 'model', 'systemPrompt',
+    'temperature', 'maxTokens', 'topP', 'frequencyPenalty', 'presencePenalty',
+    'stream', 'thinkingEnabled', 'thinkingEffort'];
+  for (const k of keys) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
+
+function convContentEqual(a, b) {
+  if (a.title !== b.title) return false;
+
+  const aVers = Object.values(a.versions);
+  const bVers = Object.values(b.versions);
+  if (aVers.length !== bVers.length) return false;
+
+  // Compare versions by label (stable identifier for same position)
+  const byLabel = (vers) => {
+    const m = {};
+    for (const v of vers) m[v.label] = v;
+    return m;
+  };
+  const aMap = byLabel(aVers);
+  const bMap = byLabel(bVers);
+
+  const labels = Object.keys(aMap);
+  if (labels.length !== Object.keys(bMap).length) return false;
+
+  for (const label of labels) {
+    const av = aMap[label];
+    const bv = bMap[label];
+    if (!bv) return false;
+    if (av.messages.length !== bv.messages.length) return false;
+    for (let i = 0; i < av.messages.length; i++) {
+      const am = av.messages[i];
+      const bm = bv.messages[i];
+      // Compare only role + content — ignore id / timestamp / reasoning
+      if (am.role !== bm.role || am.content !== bm.content) return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Merge imported conversations into the current state.
  * - If a conversation ID doesn't exist → add it as-is (incremental).
- * - If a conversation ID already exists → assign a new `'c_' + uid()` ID
- *   so the imported data becomes a separate new conversation (no data loss).
- * Returns { added, conflicted } for UI feedback.
+ * - If a conversation ID already exists AND content differs → assign a new
+ *   `'c_' + uid()` ID so the imported data becomes a separate conversation.
+ * - If ID exists AND content is identical → skip (deduplicate).
+ * Returns { added, conflicted, skipped } for UI feedback.
  */
 function mergeConversations(importedConvs) {
   let added = 0;
   let conflicted = 0;
+  let skipped = 0;
 
   for (const cid of Object.keys(importedConvs)) {
-    if (state.conversations[cid]) {
-      // Conflict: assign a new ID
+    const existing = state.conversations[cid];
+    if (!existing) {
+      state.conversations[cid] = importedConvs[cid];
+      added++;
+    } else if (convContentEqual(existing, importedConvs[cid])) {
+      // Same ID, same content → skip silently
+      skipped++;
+    } else {
+      // Same ID, different content → assign new ID
       const newId = 'c_' + uid();
       state.conversations[newId] = importedConvs[cid];
       state.conversations[newId].id = newId;
       conflicted++;
-    } else {
-      // No conflict: add directly
-      state.conversations[cid] = importedConvs[cid];
-      added++;
     }
   }
 
-  return { added, conflicted };
+  return { added, conflicted, skipped };
 }
 
 /* ─── LocalStorage ─── */
