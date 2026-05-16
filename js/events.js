@@ -463,15 +463,42 @@ function importData(file) {
     try {
       const data = JSON.parse(ev.target.result);
       if (!data.conversations) { toast('文件格式不正确', 'error'); return; }
-      state.conversations = data.conversations || {};
-      state.apiProfiles = data.apiProfiles || {};
-      state.currentProfileId = data.currentProfileId || null;
-      state.webdavConfig = data.webdavConfig || state.webdavConfig;
+
+      // Merge conversations with conflict handling
+      const { added, conflicted, skipped } = mergeConversations(data.conversations);
+
+      // Merge profiles with content dedup
+      let profileAdded = 0, profileConflicted = 0, profileSkipped = 0;
+      if (data.apiProfiles) {
+        for (const pid of Object.keys(data.apiProfiles)) {
+          const existing = state.apiProfiles[pid];
+          if (!existing) {
+            state.apiProfiles[pid] = data.apiProfiles[pid];
+            profileAdded++;
+          } else if (profileContentEqual(existing, data.apiProfiles[pid])) {
+            profileSkipped++;
+          } else {
+            const newId = 'p_' + uid();
+            state.apiProfiles[newId] = data.apiProfiles[pid];
+            state.apiProfiles[newId].id = newId;
+            profileConflicted++;
+          }
+        }
+      }
+
       state.currentConversationId = null;
       ensureDefaultProfile();
       saveState();
       fullRender();
-      toast('导入成功 ✓', 'success');
+
+      const parts = [];
+      if (added > 0) parts.push(`新增 ${added} 个对话`);
+      if (conflicted > 0) parts.push(`${conflicted} 个冲突已另存为新对话`);
+      if (skipped > 0) parts.push(`${skipped} 个重复已跳过`);
+      if (profileAdded > 0) parts.push(`新增 ${profileAdded} 个方案`);
+      if (profileConflicted > 0) parts.push(`${profileConflicted} 个方案冲突已另存`);
+      if (profileSkipped > 0) parts.push(`${profileSkipped} 个重复方案已跳过`);
+      toast('导入成功 ✓  ' + parts.join('，'), 'success');
     } catch (e) {
       toast('解析失败：' + e.message, 'error');
     }
@@ -661,7 +688,7 @@ function bindEvents() {
   document.getElementById('gist-test-btn').addEventListener('click', gistTest);
   document.getElementById('gist-backup-btn').addEventListener('click', gistBackup);
   document.getElementById('gist-restore-btn').addEventListener('click', () => {
-    if (confirm('此操作将覆盖所有本地数据，确认从 Gist 恢复？')) gistRestore();
+    if (confirm('将从 Gist 增量恢复——新对话与原对话 ID 冲突时将另存为新的独立对话，现有对话不受影响。确认恢复？')) gistRestore();
   });
 
   /* Import / Export */

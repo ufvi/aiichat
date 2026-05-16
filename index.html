@@ -182,9 +182,9 @@
       <div class="tab-panel" id="tab-data">
         <div class="section-title">本地备份</div>
         <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
-          <button class="btn btn-primary" id="export-btn">⬇ 导出 JSON</button>
+          <button class="btn btn-primary" id="export-btn">⬆ 导出 JSON</button>
           <label class="btn" style="cursor:pointer">
-            ⬆ 导入 JSON
+            ⬇ 导入 JSON
             <input type="file" id="import-file" accept=".json" style="display:none">
           </label>
         </div>
@@ -292,7 +292,7 @@
         <button class="btn btn-primary" id="gist-backup-btn">⬆ 备份到 Gist</button>
         <button class="btn" id="gist-restore-btn">⬇ 从 Gist 恢复</button>
       </div>
-      <p class="field-hint" style="margin-top:8px">恢复将覆盖所有本地数据。</p>
+      <p class="field-hint" style="margin-top:8px">恢复为增量导入模式：不覆盖现有对话，ID 冲突时自动另存为新对话。</p>
     </div>
     <div class="modal-footer">
       <button class="btn" data-close="gist-overlay">关闭</button>
