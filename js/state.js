@@ -220,6 +220,36 @@ function autoTitle(conv, firstUserMsg) {
   }
 }
 
+/* ─── Import merge ─── */
+
+/**
+ * Merge imported conversations into the current state.
+ * - If a conversation ID doesn't exist → add it as-is (incremental).
+ * - If a conversation ID already exists → assign a new `'c_' + uid()` ID
+ *   so the imported data becomes a separate new conversation (no data loss).
+ * Returns { added, conflicted } for UI feedback.
+ */
+function mergeConversations(importedConvs) {
+  let added = 0;
+  let conflicted = 0;
+
+  for (const cid of Object.keys(importedConvs)) {
+    if (state.conversations[cid]) {
+      // Conflict: assign a new ID
+      const newId = 'c_' + uid();
+      state.conversations[newId] = importedConvs[cid];
+      state.conversations[newId].id = newId;
+      conflicted++;
+    } else {
+      // No conflict: add directly
+      state.conversations[cid] = importedConvs[cid];
+      added++;
+    }
+  }
+
+  return { added, conflicted };
+}
+
 /* ─── LocalStorage ─── */
 function saveState() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }

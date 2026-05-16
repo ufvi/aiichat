@@ -133,14 +133,26 @@ async function gistRestore() {
     const backup = JSON.parse(rawContent);
     if (!backup.conversations) { toast('备份文件格式不正确', 'error'); return; }
 
-    const convCount = Object.keys(backup.conversations).length;
+    // Merge conversations with conflict handling
+    const { added, conflicted } = mergeConversations(backup.conversations);
 
-    state.conversations         = backup.conversations;
-    state.apiProfiles           = backup.apiProfiles || {};
-    state.currentProfileId      = backup.currentProfileId || null;
-    state.currentConversationId = null;
+    // Merge profiles (same strategy)
+    let profileAdded = 0, profileConflicted = 0;
+    if (backup.apiProfiles) {
+      for (const pid of Object.keys(backup.apiProfiles)) {
+        if (state.apiProfiles[pid]) {
+          const newId = 'p_' + uid();
+          state.apiProfiles[newId] = backup.apiProfiles[pid];
+          state.apiProfiles[newId].id = newId;
+          profileConflicted++;
+        } else {
+          state.apiProfiles[pid] = backup.apiProfiles[pid];
+          profileAdded++;
+        }
+      }
+    }
 
-    // 修复无效的版本引用
+    // 修复新导入对话中无效的版本引用
     for (const cid of Object.keys(state.conversations)) {
       const c = state.conversations[cid];
       if (!c.versions || !c.versions[c.currentVersionId]) {
@@ -149,11 +161,18 @@ async function gistRestore() {
       }
     }
 
+    state.currentConversationId = null;
     ensureDefaultProfile();
     saveState();
     closeModal('gist-overlay');
     fullRender();
-    toast(`恢复成功 ✓  共 ${convCount} 个对话`, 'success');
+
+    const parts = [];
+    if (added > 0) parts.push(`新增 ${added} 个对话`);
+    if (conflicted > 0) parts.push(`${conflicted} 个冲突已另存为新对话`);
+    if (profileAdded > 0) parts.push(`新增 ${profileAdded} 个方案`);
+    if (profileConflicted > 0) parts.push(`${profileConflicted} 个方案冲突已另存`);
+    toast('恢复成功 ✓  ' + parts.join('，'), 'success');
   } catch (e) {
     toast('恢复失败：' + e.message, 'error');
   }
