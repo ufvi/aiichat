@@ -1,126 +1,409 @@
-/* js/markdown.js — Markdown rendering + syntax highlighting */
+/* markdown.js — Block-based Markdown renderer for AI chat responses
+ *
+ * Architecture: line → blocks → HTML (no chained-regex soup)
+ * Handles: h1–h6, code fences, lists (nested), tables, blockquotes,
+ *          inline code, bold, italic, strikethrough, links, HR
+ */
 
-function escHtmlInner(t) {
-  return String(t)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+'use strict';
+
+// ── 1. HTML escape ────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function highlightCode(code, lang) {
-  const KW = {
-    javascript: /\b(const|let|var|function|return|if|else|for|while|class|new|import|export|from|as|async|await|try|catch|throw|typeof|this|null|undefined|true|false|of|in|switch|case|break|default|extends|super)\b/g,
-    typescript: /\b(const|let|var|function|return|if|else|for|while|class|new|import|export|from|as|async|await|try|catch|throw|typeof|this|null|undefined|true|false|interface|type|enum|extends|implements|super|abstract|readonly|keyof)\b/g,
-    python:     /\b(def|class|return|if|elif|else|for|while|import|from|as|with|try|except|finally|raise|True|False|None|lambda|and|or|not|in|is|pass|break|continue|yield|global|nonlocal)\b/g,
-    java:       /\b(public|private|protected|class|interface|extends|implements|new|return|if|else|for|while|try|catch|finally|throw|static|final|void|this|super|null|true|false|import|package)\b/g,
-    go:         /\b(func|var|const|type|struct|interface|return|if|else|for|range|switch|case|break|default|import|package|go|chan|select|defer|map|nil|true|false)\b/g,
-    rust:       /\b(fn|let|mut|const|struct|enum|impl|trait|use|mod|pub|return|if|else|for|while|loop|match|Some|None|Ok|Err|true|false|self|Self|super|crate|async|await|move|ref|where)\b/g,
-    css:        /\b(color|background|border|margin|padding|font|display|position|width|height|top|left|right|bottom|flex|grid|animation|transition|transform|opacity|overflow|cursor|pointer)\b/g,
-  };
-  const lang2 = (lang || '').toLowerCase();
-  const aliases = { js: 'javascript', ts: 'typescript', py: 'python' };
-  const resolvedLang = aliases[lang2] || lang2;
+// ── 2. Syntax highlighting ────────────────────────────────────────────────────
 
-  // Temporary placeholder approach to avoid nested replacement issues
-  const ph = [];
-  let idx = 0;
-  function placeholder(html) { const t = `\x00${idx++}\x00`; ph.push(html); return t; }
+const _ALIASES = {
+  js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript', tsx: 'typescript',
+  py: 'python',     py3: 'python',
+  sh: 'bash',       zsh: 'bash',       shell: 'bash',
+  rs: 'rust',
+  c:  'c',          cc: 'cpp',         cxx: 'cpp',
+};
 
-  let out = code;
-  // Comments first
-  out = out.replace(/(\/\/[^\n]*|\/\*[\s\S]*?\*\/|#[^\n]*)/g, m => placeholder(`<span class="tok-cmt">${escHtmlInner(m)}</span>`));
-  // Strings
-  out = out.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g, m => placeholder(`<span class="tok-str">${escHtmlInner(m)}</span>`));
-  // Numbers
-  out = out.replace(/\b(\d+\.?\d*)\b/g, m => placeholder(`<span class="tok-num">${m}</span>`));
+const _KW = {
+  javascript: /\b(async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|false|finally|for|from|function|if|import|in|instanceof|let|new|null|of|return|static|super|switch|this|throw|true|try|typeof|undefined|var|void|while|with|yield)\b/g,
+  typescript: /\b(abstract|any|as|async|await|boolean|break|case|catch|class|const|constructor|continue|declare|default|delete|do|else|enum|export|extends|false|finally|for|from|function|if|implements|import|in|infer|instanceof|interface|keyof|let|module|namespace|never|new|null|number|of|private|protected|public|readonly|return|satisfies|static|string|super|switch|this|throw|true|try|type|typeof|undefined|unknown|var|void|while|yield)\b/g,
+  python:     /\b(and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|global|if|import|in|is|lambda|None|nonlocal|not|or|pass|raise|return|True|try|while|with|yield)\b/g,
+  java:       /\b(abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|false|final|finally|float|for|if|implements|import|instanceof|int|interface|long|native|new|null|package|private|protected|public|return|short|static|super|switch|synchronized|this|throw|throws|transient|true|try|var|void|volatile|while)\b/g,
+  go:         /\b(break|case|chan|const|continue|default|defer|else|fallthrough|false|for|func|go|goto|if|import|interface|map|nil|package|range|return|select|struct|switch|true|type|var)\b/g,
+  rust:       /\b(as|async|await|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|None|Ok|Err|pub|ref|return|self|Self|Some|static|struct|super|trait|true|type|unsafe|use|where|while)\b/g,
+  c:          /\b(auto|break|case|char|const|continue|default|do|double|else|enum|extern|false|float|for|goto|if|inline|int|long|NULL|register|return|short|signed|sizeof|static|struct|switch|true|typedef|union|unsigned|void|volatile|while)\b/g,
+  cpp:        /\b(alignas|alignof|and|auto|bool|break|case|catch|char|class|concept|const|constexpr|continue|decltype|default|delete|do|double|else|enum|explicit|export|extern|false|float|for|friend|goto|if|inline|int|long|mutable|namespace|new|noexcept|nullptr|operator|override|private|protected|public|register|requires|return|short|signed|sizeof|static|struct|switch|template|this|throw|true|try|typedef|typeid|typename|union|unsigned|using|virtual|void|volatile|while)\b/g,
+  css:        /\b(absolute|animation|auto|background|border|bottom|color|content|cursor|display|flex|fixed|font|grid|height|inherit|initial|inline|left|margin|none|opacity|overflow|padding|position|relative|right|static|sticky|top|transform|transition|unset|width|z-index)\b/g,
+  bash:       /\b(break|case|continue|do|done|elif|else|esac|exit|export|false|fi|for|function|if|in|local|read|return|select|shift|then|true|unset|until|while)\b/g,
+  sql:        /\b(ADD|ALL|ALTER|AND|AS|ASC|AVG|BETWEEN|BY|CASE|COUNT|CREATE|DELETE|DESC|DISTINCT|DROP|ELSE|END|EXISTS|FALSE|FROM|FULL|GROUP|HAVING|IN|INNER|INSERT|INTO|IS|JOIN|LEFT|LIKE|LIMIT|MAX|MIN|NOT|NULL|ON|OR|ORDER|OUTER|PRIMARY|RIGHT|SELECT|SET|SUM|TABLE|THEN|TOP|TRUE|UNION|UNIQUE|UPDATE|VALUES|WHEN|WHERE)\b/gi,
+};
+
+const _COMMENT = {
+  javascript: /\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+  typescript: /\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+  java:       /\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+  go:         /\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+  rust:       /\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+  c:          /\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+  cpp:        /\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+  css:        /\/\*[\s\S]*?\*\//g,
+  python:     /#[^\n]*/g,
+  bash:       /#[^\n]*/g,
+  sql:        /--[^\n]*/g,
+};
+
+function highlight(rawCode, lang) {
+  const resolved = _ALIASES[lang.toLowerCase()] ?? lang.toLowerCase();
+  const slots = [];
+
+  function slot(html) {
+    slots.push(html);
+    return `\x02${slots.length - 1}\x02`;
+  }
+
+  let s = rawCode;
+
+  // Comments first (protect from string/keyword passes)
+  const cRe = _COMMENT[resolved];
+  if (cRe) s = s.replace(cRe, m => slot(`<span class="tok-cmt">${esc(m)}</span>`));
+
+  // Strings: double, single, template
+  s = s.replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g,
+    m => slot(`<span class="tok-str">${esc(m)}</span>`));
+
+  // Numbers: hex, binary, decimal, float
+  s = s.replace(/\b(0x[\da-fA-F]+|0b[01]+|\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g,
+    m => slot(`<span class="tok-num">${m}</span>`));
+
   // Keywords
-  const kwRe = KW[resolvedLang];
-  if (kwRe) out = out.replace(kwRe, m => placeholder(`<span class="tok-kw">${m}</span>`));
-  // Function names
-  out = out.replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/g, m => placeholder(`<span class="tok-fn">${m.replace(/\s*$/, '')}</span>(`));
+  const kwRe = _KW[resolved];
+  if (kwRe) {
+    kwRe.lastIndex = 0;
+    s = s.replace(kwRe, m => slot(`<span class="tok-kw">${m}</span>`));
+  }
 
-  // Escape remaining HTML
-  out = out.replace(/[&<>"']/g, ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[ch]));
-  // Restore placeholders
-  return out.replace(/\x00(\d+)\x00/g, (_, i) => ph[+i]);
+  // Function / method call names
+  s = s.replace(/\b([A-Za-z_$][A-Za-z0-9_$]*)(\s*)(?=\()/g,
+    (_, name, sp) => slot(`<span class="tok-fn">${esc(name)}</span>`) + sp);
+
+  // Restore: escape bare text, substitute placeholders
+  const phRe = /\x02(\d+)\x02/g;
+  let result = '', last = 0, m;
+  while ((m = phRe.exec(s)) !== null) {
+    result += esc(s.slice(last, m.index));
+    result += slots[+m[1]];
+    last   = m.index + m[0].length;
+  }
+  return result + esc(s.slice(last));
 }
 
-function renderMarkdown(raw) {
-  if (!raw) return '';
+// ── 3. Inline rendering ───────────────────────────────────────────────────────
 
-  // Step 1: extract code blocks to protect them
-  const codeBlocks = [];
-  let out = raw.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
-    const escapedCode = escHtmlInner(code.trimEnd());
-    const highlighted = highlightCode(escapedCode, lang);
-    const langLabel = lang || 'CODE';
-    const block = `<div class="code-block"><div class="code-block-header"><span class="code-lang">${langLabel}</span><button class="code-copy-btn" onclick="copyCode(this)">复制</button></div><code>${highlighted}</code></div>`;
-    codeBlocks.push(block);
-    return `\x01CODE${codeBlocks.length - 1}\x01`;
-  });
+/** Render inline Markdown (bold, italic, code, links, strikethrough) */
+function inline(raw) {
+  const parts = [];
+  // Split on inline code spans (supports multi-backtick: ``code``)
+  const re = /(`+)([\s\S]*?)\1/g;
+  let last = 0, m;
+  while ((m = re.exec(raw)) !== null) {
+    if (m.index > last) parts.push(_fmt(raw.slice(last, m.index)));
+    parts.push(`<code class="md-ic">${esc(m[2].trim())}</code>`);
+    last = m.index + m[0].length;
+  }
+  if (last < raw.length) parts.push(_fmt(raw.slice(last)));
+  return parts.join('');
+}
 
-  // Inline code
-  out = out.replace(/`([^`\n]+)`/g, (_, code) =>
-    `<code class="inline-code">${escHtmlInner(code)}</code>`
-  );
+/** Format non-code inline text (escape HTML, then apply emphasis/links) */
+function _fmt(s) {
+  s = esc(s);
+  // Bold + italic (must come before bold/italic alone)
+  s = s.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  // Bold
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Italic
+  s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Strikethrough
+  s = s.replace(/~~(.+?)~~/g, '<del>$1</del>');
+  // Links — href is already HTML-escaped via esc() above; that's valid in attributes
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+    (_, t, u) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`);
+  return s;
+}
 
-  // Headers
-  out = out.replace(/^#{3} (.+)$/gm, '<h3>$1</h3>');
-  out = out.replace(/^#{2} (.+)$/gm, '<h2>$1</h2>');
-  out = out.replace(/^# (.+)$/gm,    '<h1>$1</h1>');
+// ── 4. Block parser ───────────────────────────────────────────────────────────
 
-  // Blockquotes
-  out = out.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+/**
+ * Parse an array of lines into a flat array of block objects:
+ *   { type: 'heading',    level, text }
+ *   { type: 'code',       lang, code }
+ *   { type: 'blockquote', lines }
+ *   { type: 'table',      lines }
+ *   { type: 'list',       items: [{indent, ordered, text}] }
+ *   { type: 'hr' }
+ *   { type: 'para',       lines }
+ */
+function parseBlocks(lines) {
+  const blocks = [];
+  let i = 0;
 
-  // Tables
-  out = out.replace(
-    /\|(.+)\|\n\|[-: |]+\|\n((?:\|.+\|\n?)+)/g,
-    (_, header, body) => {
-      const ths = header.split('|').filter(Boolean).map(h => `<th>${h.trim()}</th>`).join('');
-      const rows = body.trim().split('\n').map(r => {
-        const tds = r.split('|').filter(Boolean).map(c => `<td>${c.trim()}</td>`).join('');
-        return `<tr>${tds}</tr>`;
-      }).join('');
-      return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // ── Code fence (```` ``` ```` or ~~~) ───────────────────────────────────
+    const fenceM = line.match(/^(`{3,}|~{3,})([\w+#.-]*)/);
+    if (fenceM) {
+      const fence     = fenceM[1];
+      const fenceChar = fence[0];
+      const lang      = fenceM[2] || '';
+      const codeLines = [];
+      i++;
+      while (i < lines.length) {
+        const cl = lines[i];
+        // Closing fence: same character, at least as many, nothing else on line
+        if (cl.startsWith(fenceChar.repeat(fence.length)) &&
+            cl.trim().replace(/[`~]/g, '').length === 0) {
+          i++;
+          break;
+        }
+        codeLines.push(cl);
+        i++;
+      }
+      blocks.push({ type: 'code', lang, code: codeLines.join('\n') });
+      continue;
     }
-  );
 
-  // Bold + italic
-  out = out.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  out = out.replace(/\*\*(.+?)\*\*/g,     '<strong>$1</strong>');
-  out = out.replace(/\*(.+?)\*/g,         '<em>$1</em>');
+    // ── ATX Heading (# … ######) ─────────────────────────────────────────────
+    const headM = line.match(/^(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/);
+    if (headM) {
+      blocks.push({ type: 'heading', level: headM[1].length, text: headM[2] });
+      i++;
+      continue;
+    }
 
-  // Links
-  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-  );
+    // ── Horizontal rule ───────────────────────────────────────────────────────
+    if (/^[ \t]*([-*_])(\s*\1){2,}[ \t]*$/.test(line) && line.trim().length >= 3) {
+      blocks.push({ type: 'hr' });
+      i++;
+      continue;
+    }
 
-  // Lists
-  out = out.replace(/^[ \t]*[-*+] (.+)$/gm, '<li>$1</li>');
-  out = out.replace(/^[ \t]*\d+\. (.+)$/gm,  '<li>$1</li>');
-  out = out.replace(/((?:<li>[\s\S]*?<\/li>\n?)+)/g, '<ul>$1</ul>');
+    // ── Blockquote ────────────────────────────────────────────────────────────
+    if (/^>/.test(line)) {
+      const bqLines = [];
+      while (i < lines.length && /^>/.test(lines[i])) {
+        bqLines.push(lines[i].replace(/^>[ \t]?/, ''));
+        i++;
+      }
+      blocks.push({ type: 'blockquote', lines: bqLines });
+      continue;
+    }
 
-  // Paragraphs (split on blank lines)
-  const parts = out.split(/\n{2,}/);
-  out = parts.map(p => {
-    p = p.trim();
-    if (!p) return '';
-    if (/^<(h[1-6]|ul|ol|blockquote|table|div|pre|\x01CODE)/.test(p)) return p;
-    return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
-  }).filter(Boolean).join('\n');
+    // ── Table (detect by pipe + separator row) ────────────────────────────────
+    if (line.includes('|') && i + 1 < lines.length &&
+        /^\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?$/.test(lines[i + 1])) {
+      const tableLines = [];
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      blocks.push({ type: 'table', lines: tableLines });
+      continue;
+    }
 
-  // Restore code blocks
-  out = out.replace(/\x01CODE(\d+)\x01/g, (_, i) => codeBlocks[+i]);
+    // ── List item ─────────────────────────────────────────────────────────────
+    if (/^[ \t]*(?:[-*+]|\d+\.)[ \t]/.test(line)) {
+      const items = [];
+      while (i < lines.length) {
+        const l  = lines[i];
+        const lm = l.match(/^([ \t]*)(?:([-*+])|(\d+)\.)[ \t]+([\s\S]*)/);
+        if (lm) {
+          items.push({
+            indent:  lm[1].replace(/\t/g, '    ').length,
+            ordered: !!lm[3],
+            text:    lm[4],
+          });
+          i++;
+        } else if (l.trim() === '' && i + 1 < lines.length &&
+                   /^[ \t]*(?:[-*+]|\d+\.)[ \t]/.test(lines[i + 1])) {
+          // Blank line between list items — skip it
+          i++;
+        } else {
+          break;
+        }
+      }
+      blocks.push({ type: 'list', items });
+      continue;
+    }
 
-  return out;
+    // ── Blank line ────────────────────────────────────────────────────────────
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+
+    // ── Paragraph (accumulate until next block-level element) ─────────────────
+    const paraLines = [];
+    while (i < lines.length) {
+      const l = lines[i];
+      if (l.trim() === '')                                          break;
+      if (/^#{1,6}[ \t]/.test(l))                                  break;
+      if (/^(`{3,}|~{3,})/.test(l))                               break;
+      if (/^[ \t]*([-*_])(\s*\1){2,}[ \t]*$/.test(l))             break;
+      if (/^>/.test(l))                                            break;
+      if (/^[ \t]*(?:[-*+]|\d+\.)[ \t]/.test(l))                  break;
+      if (l.includes('|') && i + 1 < lines.length &&
+          /^\|?[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?$/.test(lines[i + 1])) break;
+      paraLines.push(l);
+      i++;
+    }
+    if (paraLines.length) blocks.push({ type: 'para', lines: paraLines });
+  }
+
+  return blocks;
 }
 
+// ── 5. Block renderer ─────────────────────────────────────────────────────────
+
+function renderBlock(block) {
+  switch (block.type) {
+
+    case 'code': {
+      const lang  = block.lang;
+      const label = esc(lang.toUpperCase() || 'TEXT');
+      const hi    = highlight(block.code, lang);
+      return (
+        `<div class="md-code">\n` +
+        `  <div class="md-code-bar">` +
+          `<span class="md-lang">${label}</span>` +
+          `<button class="md-copy" onclick="copyCode(this)">复制</button>` +
+        `</div>\n` +
+        `  <pre><code>${hi}</code></pre>\n` +
+        `</div>`
+      );
+    }
+
+    case 'heading':
+      return `<h${block.level} class="md-h">${inline(block.text)}</h${block.level}>`;
+
+    case 'hr':
+      return '<hr class="md-hr">';
+
+    case 'blockquote': {
+      const inner = parseBlocks(block.lines).map(renderBlock).join('\n');
+      return `<blockquote class="md-bq">${inner}</blockquote>`;
+    }
+
+    case 'table':
+      return renderTable(block.lines);
+
+    case 'list':
+      return renderList(block.items, 0);
+
+    case 'para': {
+      // Two spaces before \n → <br>; bare newlines → <br> for readable wrapping
+      const raw = block.lines.join('\n').replace(/  \n/g, '\n');
+      return `<p class="md-p">${inline(raw).replace(/\n/g, '<br>')}</p>`;
+    }
+
+    default:
+      return '';
+  }
+}
+
+// ── 6. Table renderer ─────────────────────────────────────────────────────────
+
+function renderTable(lines) {
+  /** Is this line a separator row? e.g. | :--- | ---: | */
+  const isSep = l => /^\|?[ \t]*:?-{1,}:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)*\|?$/.test(l) &&
+                     !/[A-Za-z0-9]/.test(l);
+
+  function parseRow(l) {
+    return l.replace(/^\||\|$/g, '').split('|').map(c => inline(c.trim()));
+  }
+
+  const sepIdx    = lines.findIndex(isSep);
+  const headLines = sepIdx > 0 ? lines.slice(0, sepIdx) : [];
+  const bodyLines = sepIdx >= 0 ? lines.slice(sepIdx + 1) : lines;
+
+  const thead = headLines.length
+    ? `<thead>${headLines.map(l =>
+        `<tr>${parseRow(l).map(c => `<th>${c}</th>`).join('')}</tr>`
+      ).join('')}</thead>`
+    : '';
+
+  const tbody = `<tbody>${bodyLines
+    .filter(l => l.trim() && l.includes('|'))
+    .map(l => `<tr>${parseRow(l).map(c => `<td>${c}</td>`).join('')}</tr>`)
+    .join('')}</tbody>`;
+
+  return `<table class="md-table">${thead}${tbody}</table>`;
+}
+
+// ── 7. List renderer (recursive, handles nesting) ─────────────────────────────
+
+/**
+ * Render list items starting at index `start`.
+ * Items with indent > items[start].indent become a nested sub-list.
+ * Returns the rendered HTML string.
+ */
+function renderList(items, start) {
+  if (start >= items.length) return '';
+  const base = items[start].indent;
+  const tag  = items[start].ordered ? 'ol' : 'ul';
+  let html   = `<${tag} class="md-list">`;
+  let i      = start;
+
+  while (i < items.length) {
+    const item = items[i];
+    if (item.indent < base) break;            // back up to parent
+    if (item.indent > base) { i++; continue; } // shouldn't happen here
+
+    html += `<li>${inline(item.text)}`;
+    i++;
+
+    // If next item is at a deeper indent, render it as a sub-list
+    if (i < items.length && items[i].indent > base) {
+      const subStart = i;
+      html += renderList(items, subStart);
+      // Skip past all sub-items we just consumed
+      while (i < items.length && items[i].indent > base) i++;
+    }
+
+    html += '</li>';
+  }
+
+  return html + `</${tag}>`;
+}
+
+// ── 8. Public API ─────────────────────────────────────────────────────────────
+
+/**
+ * renderMarkdown(raw) → HTML string
+ * Main entry point. Accepts a raw Markdown string, returns safe HTML.
+ */
+function renderMarkdown(raw) {
+  if (!raw || !raw.trim()) return '';
+  return parseBlocks(raw.split('\n')).map(renderBlock).join('\n');
+}
+
+/**
+ * copyCode(btn)
+ * Copy button handler for code blocks.
+ * Uses textContent of <code> so HTML entities are automatically decoded.
+ */
 function copyCode(btn) {
-  const code = btn.closest('.code-block').querySelector('code').innerText;
-  navigator.clipboard.writeText(code).then(() => {
+  const codeEl = btn.closest('.md-code').querySelector('pre > code');
+  if (!codeEl) return;
+  navigator.clipboard.writeText(codeEl.textContent).then(() => {
     const orig = btn.textContent;
     btn.textContent = '✓ 已复制';
-    setTimeout(() => { btn.textContent = orig; }, 1600);
+    setTimeout(() => { btn.textContent = orig; }, 1500);
   }).catch(() => {
-    toast('复制失败', 'error');
+    if (typeof toast === 'function') toast('复制失败', 'error');
   });
 }
