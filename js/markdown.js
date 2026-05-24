@@ -277,10 +277,10 @@ function renderBlock(block) {
       const label = esc(lang.toUpperCase() || 'TEXT');
       const hi    = highlight(block.code, lang);
       return (
-        `<div class="md-code">\n` +
-        `  <div class="md-code-bar">` +
-          `<span class="md-lang">${label}</span>` +
-          `<button class="md-copy" onclick="copyCode(this)">复制</button>` +
+        `<div class="code-block">\n` +
+        `  <div class="code-block-header">` +
+          `<span class="code-lang">${label}</span>` +
+          `<button class="code-copy-btn" onclick="copyCode(this)">复制</button>` +
         `</div>\n` +
         `  <pre><code>${hi}</code></pre>\n` +
         `</div>`
@@ -397,7 +397,7 @@ function renderMarkdown(raw) {
  * Uses textContent of <code> so HTML entities are automatically decoded.
  */
 function copyCode(btn) {
-  const codeEl = btn.closest('.md-code').querySelector('pre > code');
+  const codeEl = btn.closest('.code-block').querySelector('pre > code');
   if (!codeEl) return;
   navigator.clipboard.writeText(codeEl.textContent).then(() => {
     const orig = btn.textContent;
