@@ -62,7 +62,7 @@ function highlight(rawCode, lang) {
 
   function slot(html) {
     slots.push(html);
-    return `\x02${slots.length - 1}\x02`;
+    return `\x02s${slots.length - 1}\x02`;
   }
 
   let s = rawCode;
@@ -91,7 +91,7 @@ function highlight(rawCode, lang) {
     (_, name, sp) => slot(`<span class="tok-fn">${esc(name)}</span>`) + sp);
 
   // Restore: escape bare text, substitute placeholders
-  const phRe = /\x02(\d+)\x02/g;
+  const phRe = /\x02s(\d+)\x02/g;
   let result = '', last = 0, m;
   while ((m = phRe.exec(s)) !== null) {
     result += esc(s.slice(last, m.index));
@@ -111,7 +111,7 @@ function inline(raw) {
   let last = 0, m;
   while ((m = re.exec(raw)) !== null) {
     if (m.index > last) parts.push(_fmt(raw.slice(last, m.index)));
-    parts.push(`<code class="md-ic">${esc(m[2].trim())}</code>`);
+    parts.push(`<code class="inline-code">${esc(m[2].trim())}</code>`);
     last = m.index + m[0].length;
   }
   if (last < raw.length) parts.push(_fmt(raw.slice(last)));
