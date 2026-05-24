@@ -273,16 +273,28 @@ function renderBlock(block) {
   switch (block.type) {
 
     case 'code': {
-      const lang  = block.lang;
-      const label = esc(lang.toUpperCase() || 'TEXT');
-      const hi    = highlight(block.code, lang);
+      const lang   = block.lang;
+      const lcLang = lang.toLowerCase();
+      const label  = esc(lang.toUpperCase() || 'TEXT');
+      const hi     = highlight(block.code, lang);
+      const isHtml = lcLang === 'html';
+      const previewBtn = isHtml
+        ? `<button class="code-preview-btn" onclick="togglePreview(this)">👁 预览</button>`
+        : '';
+      const previewDiv = isHtml
+        ? `\n  <div class="code-preview" style="display:none"><div class="code-preview-inner">${block.code}</div></div>`
+        : '';
       return (
         `<div class="code-block">\n` +
         `  <div class="code-block-header">` +
           `<span class="code-lang">${label}</span>` +
-          `<button class="code-copy-btn" onclick="copyCode(this)">复制</button>` +
+          `<div class="code-block-actions">` +
+            previewBtn +
+            `<button class="code-copy-btn" onclick="copyCode(this)">复制</button>` +
+          `</div>` +
         `</div>\n` +
         `  <pre><code>${hi}</code></pre>\n` +
+        previewDiv +
         `</div>`
       );
     }
@@ -406,4 +418,16 @@ function copyCode(btn) {
   }).catch(() => {
     if (typeof toast === 'function') toast('复制失败', 'error');
   });
+}
+
+/**
+ * togglePreview(btn)
+ * Toggle HTML preview visibility for HTML code blocks.
+ */
+function togglePreview(btn) {
+  const block   = btn.closest('.code-block');
+  const preview = block.querySelector('.code-preview');
+  const hidden  = preview.style.display === 'none';
+  preview.style.display = hidden ? 'block' : 'none';
+  btn.textContent = hidden ? '👁 隐藏' : '👁 预览';
 }

@@ -370,12 +370,28 @@ body { display: flex; height: 100vh; }
   background: var(--bg-1);
 }
 .code-lang { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); text-transform: uppercase; }
-.code-copy-btn {
+.code-block-actions {
+  display: flex; align-items: center; gap: 4px;
+}
+.code-copy-btn, .code-preview-btn {
   background: none; border: none; color: var(--text-3);
   cursor: pointer; font-size: 11px; padding: 2px 6px;
   border-radius: 4px; transition: all 0.15s; font-family: var(--font-ui);
 }
-.code-copy-btn:hover { background: var(--bg-hover); color: var(--text-1); }
+.code-copy-btn:hover, .code-preview-btn:hover { background: var(--bg-hover); color: var(--text-1); }
+.code-preview {
+  border-top: 1px solid var(--border);
+  padding: 12px 14px;
+  background: var(--bg-1);
+  overflow-x: auto;
+}
+.code-preview-inner {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-1);
+}
+.code-preview-inner img { max-width: 100%; border-radius: var(--radius-sm); }
 .code-block code {
   display: block; padding: 12px 14px;
   font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65;
@@ -383,10 +399,10 @@ body { display: flex; height: 100vh; }
 }
 /* Syntax tokens */
 .tok-kw  { color: #c084fc; }
-.tok-str { color: #86efac; }
+.tok-str { color: #0066cc; }
 .tok-num { color: #fbbf24; }
 .tok-cmt { color: var(--text-3); font-style: italic; }
-.tok-fn  { color: #67e8f9; }
+.tok-fn  { color: #008000; }
 
 /* ─── INPUT AREA ─── */
 #input-area {
