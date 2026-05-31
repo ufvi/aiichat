@@ -163,13 +163,38 @@ async function sendMessage(userText, isResumeVersion = false) {
     let fullContent = '';
     let fullReasoning = '';
 
+    // ── Streaming render throttle ──
+    // Avoid re-rendering the entire accumulated content on every tiny chunk,
+    // which causes O(n²) freeze on long outputs. Cap to ~50ms intervals.
+    let lastStreamRender = 0;
+    const STREAM_RENDER_THROTTLE = 50;
+    let pendingFlush = null;
+
+    function flushStreamRender() {
+      pendingFlush = null;
+      if (bodyEl) bodyEl.innerHTML = buildMsgBodyHTML(fullContent, fullReasoning, true);
+    }
+
+    function scheduleStreamRender() {
+      const now = Date.now();
+      if (now - lastStreamRender >= STREAM_RENDER_THROTTLE) {
+        lastStreamRender = now;
+        flushStreamRender();
+      } else if (!pendingFlush) {
+        pendingFlush = setTimeout(() => {
+          lastStreamRender = Date.now();
+          flushStreamRender();
+        }, STREAM_RENDER_THROTTLE);
+      }
+    }
+
     try {
       const result = await callAPI(msgsForAPI, (content, reasoning) => {
         fullContent = content;
         fullReasoning = reasoning || '';
         aiMsg.content = fullContent;
         aiMsg.reasoning = fullReasoning;
-        if (bodyEl) bodyEl.innerHTML = buildMsgBodyHTML(fullContent, fullReasoning, true);
+        scheduleStreamRender();
       });
       fullContent = result.content;
       fullReasoning = result.reasoning || '';
@@ -188,6 +213,9 @@ async function sendMessage(userText, isResumeVersion = false) {
         return;
       }
     }
+
+    // Cancel any pending streaming flush; final render below takes over
+    if (pendingFlush) { clearTimeout(pendingFlush); pendingFlush = null; }
 
     aiMsg.content = fullContent;
     aiMsg.reasoning = fullReasoning;
