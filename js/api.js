@@ -163,28 +163,42 @@ async function sendMessage(userText, isResumeVersion = false) {
     let fullContent = '';
     let fullReasoning = '';
 
-    // ── Streaming render throttle ──
-    // Avoid re-rendering the entire accumulated content on every tiny chunk,
-    // which causes O(n²) freeze on long outputs. Cap to ~50ms intervals.
-    let lastStreamRender = 0;
-    const STREAM_RENDER_THROTTLE = 50;
+    // ── Streaming render: incremental append ──
+    // Instead of re-rendering the ENTIRE accumulated content on every chunk
+    // (O(n²) → freeze on long output), we append ONLY the delta to the DOM.
+    // Thinking block is rendered once and its content updated incrementally.
+    // Full markdown + syntax highlighting is applied only when stream finishes.
+    let renderedContentLen = 0;
+    let hasRenderedThinking = false;
     let pendingFlush = null;
 
     function flushStreamRender() {
       pendingFlush = null;
-      if (bodyEl) bodyEl.innerHTML = buildMsgBodyHTML(fullContent, fullReasoning, true);
+      if (!bodyEl) return;
+
+      // 1. Thinking block: render once when reasoning first appears,
+      //    then update the content div incrementally as more arrives
+      if (fullReasoning) {
+        if (!hasRenderedThinking) {
+          bodyEl.insertAdjacentHTML('afterbegin', buildThinkingHTML(fullReasoning, true));
+          hasRenderedThinking = true;
+        } else {
+          const tc = bodyEl.querySelector('.thinking-content');
+          if (tc) tc.innerHTML = renderMarkdown(fullReasoning);
+        }
+      }
+
+      // 2. Content: append only the NEW text as escaped HTML (no markdown parse)
+      const delta = fullContent.slice(renderedContentLen);
+      if (delta) {
+        bodyEl.insertAdjacentHTML('beforeend', esc(delta));
+        renderedContentLen = fullContent.length;
+      }
     }
 
     function scheduleStreamRender() {
-      const now = Date.now();
-      if (now - lastStreamRender >= STREAM_RENDER_THROTTLE) {
-        lastStreamRender = now;
-        flushStreamRender();
-      } else if (!pendingFlush) {
-        pendingFlush = setTimeout(() => {
-          lastStreamRender = Date.now();
-          flushStreamRender();
-        }, STREAM_RENDER_THROTTLE);
+      if (!pendingFlush) {
+        pendingFlush = setTimeout(() => flushStreamRender(), 30);
       }
     }
 
