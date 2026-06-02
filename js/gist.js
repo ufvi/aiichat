@@ -119,10 +119,14 @@ async function gistRestore() {
     const fileInfo = data.files?.[GIST_FILENAME];
     if (!fileInfo) { toast(`Gist 中未找到 ${GIST_FILENAME}`, 'error'); return; }
 
-    // GitHub 对大文件会截断 content，需用 raw_url 获取完整内容
+    // GitHub 对大文件会截断 content，改用 API raw 端点获取完整内容
     let rawContent = fileInfo.content;
     if (fileInfo.truncated || !rawContent) {
-      const rawResp = await fetch(fileInfo.raw_url, { headers: gistHeaders(token) });
+      const sha = fileInfo.raw_url.split('/').slice(-2, -1)[0];
+      const rawResp = await fetch(
+        `https://api.github.com/gists/${gistId}/raw/${sha}/${GIST_FILENAME}`,
+        { headers: gistHeaders(token) }
+      );
       if (!rawResp.ok) {
         toast('获取备份内容失败：' + rawResp.status, 'error');
         return;
